@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@mediapipe/selfie_segmentation": "^0.1.1675465747",
+    "playwright": "^1.61.1",
+    "qrcode-generator": "^2.0.4"
+  }
+}

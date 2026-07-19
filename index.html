@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%93%B8%3C/text%3E%3C/svg%3E" />
+<title>Photobooth</title>
+<style>
+  :root {
+    --bg:#0e0f13; --panel:#171922; --ink:#f3f4f8; --muted:#9aa0b4;
+    --accent:#e7c69b; --accent-2:#c98a6b; --danger:#e06c75; --ok:#6ee7b7; --warn:#e0a06c;
+    --radius:18px; --shadow:0 10px 40px rgba(0,0,0,.45);
+    --font: system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html,body { height:100%; }
+  body {
+    margin:0; background:radial-gradient(1200px 800px at 50% -10%, #1b1e2b 0%, var(--bg) 60%);
+    color:var(--ink); font-family:var(--font); -webkit-font-smoothing:antialiased;
+    display:flex; flex-direction:column; min-height:100%;
+  }
+  header { text-align:center; padding:18px 16px 6px; }
+  header h1 { margin:0; font-size:20px; letter-spacing:.35em; text-transform:uppercase; font-weight:600; }
+  header p { margin:4px 0 0; color:var(--muted); font-size:13px; }
+  main { flex:1; display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; padding:12px 20px 20px; max-width:1180px; width:100%; margin:0 auto; }
+  @media (max-width:880px){ main{ grid-template-columns:1fr; } #galleryPanel{ order:3; } }
+
+  #stage { position:relative; background:#000; border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow); aspect-ratio:4/3; display:flex; align-items:center; justify-content:center; }
+  #video { position:absolute; width:2px; height:2px; opacity:0; pointer-events:none; }
+  #proc { width:100%; height:100%; object-fit:cover; display:block; background:#000; }
+  #countdown { position:absolute; inset:0; display:none; align-items:center; justify-content:center; font-size:clamp(90px,22vw,240px); font-weight:800; color:#fff; text-shadow:0 6px 40px rgba(0,0,0,.6); pointer-events:none; }
+  #countdown.show { display:flex; animation:pop .9s ease-out; }
+  @keyframes pop { 0%{transform:scale(.4);opacity:0;} 30%{transform:scale(1);opacity:1;} 100%{transform:scale(1.25);opacity:0;} }
+  #prompt { position:absolute; left:50%; bottom:22px; transform:translateX(-50%); background:rgba(0,0,0,.55); color:#fff; padding:8px 18px; border-radius:999px; font-size:16px; display:none; backdrop-filter:blur(4px); }
+  #prompt.show { display:block; }
+  #shotDots { position:absolute; top:14px; left:50%; transform:translateX(-50%); display:flex; gap:8px; padding:6px 10px; background:rgba(0,0,0,.4); border-radius:999px; backdrop-filter:blur(4px); }
+  #shotDots .dot { width:9px; height:9px; border-radius:50%; background:rgba(255,255,255,.35); }
+  #shotDots .dot.done { background:var(--accent); }
+  #shotDots.hidden { display:none; }
+  #aiBadge { position:absolute; top:12px; left:12px; font-size:11px; letter-spacing:.06em; background:rgba(0,0,0,.5); color:var(--accent); padding:5px 9px; border-radius:999px; display:none; backdrop-filter:blur(4px); }
+  #aiBadge.show { display:block; }
+  #flash { position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; }
+  #flash.fire { animation:flash .35s ease-out; }
+  @keyframes flash { 0%{opacity:.9;} 100%{opacity:0;} }
+  #camError { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; padding:24px; background:#11131a; }
+  #camError.show { display:flex; }
+  #camError .big { font-size:40px; }
+
+  #controls { margin-top:14px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .btn { appearance:none; border:0; cursor:pointer; font-family:var(--font); font-size:15px; font-weight:600; padding:12px 18px; border-radius:12px; background:#232634; color:var(--ink); transition:transform .06s ease, filter .15s ease, background .15s ease; }
+  .btn:hover { filter:brightness(1.12); }
+  .btn:active { transform:translateY(1px); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .btn.primary { background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#201a12; font-weight:700; padding:14px 26px; font-size:16px; box-shadow:0 6px 24px rgba(231,198,155,.25); }
+  .btn.ghost { background:transparent; border:1px solid #303445; }
+  .btn.on { background:linear-gradient(135deg,#6ee7b7,#3b82f6); color:#06210f; }
+  .seg { display:inline-flex; background:#232634; border-radius:12px; overflow:hidden; }
+  .seg button { border:0; background:transparent; color:var(--muted); cursor:pointer; padding:10px 14px; font-size:14px; font-weight:600; font-family:var(--font); }
+  .seg button.active { background:#343849; color:var(--ink); }
+  .spacer { flex:1; }
+  .hint { color:var(--muted); font-size:13px; }
+  kbd { background:#000; border:1px solid #2a2e3c; border-bottom-width:2px; border-radius:6px; padding:1px 7px; font-size:12px; font-family:var(--font); }
+
+  #bgTray { margin-top:12px; padding:12px; background:var(--panel); border-radius:14px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:10px; }
+  #bgTray.hidden { display:none; }
+  #bgChips { display:flex; gap:10px; overflow-x:auto; padding-bottom:2px; }
+  .bgchip { flex:0 0 auto; width:70px; text-align:center; cursor:pointer; }
+  .bgchip .sw { height:44px; border-radius:9px; border:2px solid transparent; background-size:cover; background-position:center; display:flex; align-items:center; justify-content:center; font-size:18px; color:#cfd3e0; }
+  .bgchip.active .sw { border-color:var(--accent); box-shadow:0 0 0 2px rgba(231,198,155,.25); }
+  .bgchip.custom .sw { border:2px dashed #3a3f52; }
+  .bgchip .lbl { font-size:11px; color:var(--muted); margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #bgUrlRow { display:flex; gap:8px; align-items:center; }
+  #bgUrl { flex:1; background:#0e0f16; border:1px solid #2a2e3c; color:var(--ink); border-radius:10px; padding:9px 12px; font-size:13px; font-family:var(--font); }
+  #bgUrlRow .hint { flex-basis:100%; margin-top:-2px; }
+
+  #galleryPanel { background:var(--panel); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); display:flex; flex-direction:column; min-height:200px; }
+  #galleryPanel h2 { margin:0 0 12px; font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:700; display:flex; align-items:center; justify-content:space-between; }
+  #galleryPanel h2 button { font-size:11px; }
+  #gallery { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; overflow-y:auto; align-content:start; }
+  #gallery .empty { color:var(--muted); font-size:13px; grid-column:1/-1; }
+  .thumb { position:relative; border-radius:10px; overflow:hidden; cursor:pointer; border:1px solid #262a38; background:#000; aspect-ratio:1/3; }
+  .thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .thumb .dl { position:absolute; inset:auto 0 0 0; background:rgba(0,0,0,.6); color:#fff; font-size:11px; text-align:center; padding:4px 0; opacity:0; transition:opacity .15s; }
+  .thumb:hover .dl { opacity:1; }
+
+  #result { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(4,5,8,.82); backdrop-filter:blur(6px); z-index:20; padding:20px; }
+  #result.show { display:flex; }
+  #resultCard { background:var(--panel); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); max-width:92vw; max-height:92vh; display:flex; gap:22px; align-items:center; }
+  @media (max-width:700px){ #resultCard{ flex-direction:column; } }
+  #stripPreview { max-height:74vh; border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,.5); }
+  #resultActions { display:flex; flex-direction:column; gap:12px; min-width:220px; }
+  #resultActions h3 { margin:0 0 4px; font-size:18px; }
+  #resultActions p { margin:0 0 8px; color:var(--muted); font-size:13px; }
+  #resultActions .ustat { min-height:18px; margin:0 0 4px; font-size:13px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1 id="brandTitle">Photobooth</h1>
+    <p id="brandSub">V1.0 · booth · cloud + local collection · gallery</p>
+  </header>
+
+  <main>
+    <section>
+      <div id="stage">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="proc"></canvas>
+        <div id="aiBadge">✨ background</div>
+        <div id="shotDots" class="hidden"></div>
+        <div id="countdown"></div>
+        <div id="prompt">Smile! 📸</div>
+        <div id="flash"></div>
+        <div id="camError">
+          <div class="big">📷</div>
+          <div id="camErrorMsg">Camera not available.</div>
+          <button class="btn primary" id="retryCam">Enable camera</button>
+        </div>
+      </div>
+
+      <div id="controls">
+        <button class="btn primary" id="startBtn" disabled>Start</button>
+        <button class="btn ghost" id="switchCam" style="display:none">⇆ Camera</button>
+        <button class="btn ghost" id="bgToggle">✨ Background: Off</button>
+        <div class="seg" id="countSeg" title="Photos per strip">
+          <button data-n="3">3 shots</button>
+          <button data-n="4" class="active">4 shots</button>
+        </div>
+        <button class="btn ghost" id="mirrorBtn" title="Mirror preview">Mirror: On</button>
+        <label class="hint" style="display:inline-flex;align-items:center;gap:6px;">Strip
+          <select id="themeSel" title="Strip theme" style="background:#232634;color:var(--ink);border:1px solid #303445;border-radius:10px;padding:9px 10px;font:600 14px var(--font);cursor:pointer;">
+            <option value="classic">Classic</option>
+            <option value="noir">Noir B&amp;W</option>
+            <option value="warm">Warm Film</option>
+            <option value="wedding">Wedding</option>
+          </select>
+        </label>
+        <button class="btn ghost" id="galleryLink" title="Browse saved sessions">🖼 Gallery</button>
+        <button class="btn ghost" id="qrBtn" title="QR code for this page">📱 QR</button>
+        <span id="collState" class="hint" title="Local collection backend status">● collection: …</span>
+        <span class="spacer"></span>
+        <span class="hint">Press <kbd>Space</kbd> to start</span>
+      </div>
+
+      <div id="bgTray" class="hidden">
+        <div id="bgChips"></div>
+        <div id="bgUrlRow">
+          <input id="bgUrl" type="text" placeholder="…or paste an image URL (e.g. a Central Park photo) and press Enter" />
+          <button class="btn" id="bgUrlBtn">Use URL</button>
+          <span class="hint">Custom photos: upload or paste a URL. Some sites block cross-origin use (then just upload the file).</span>
+        </div>
+      </div>
+    </section>
+
+    <aside id="galleryPanel">
+      <h2>This session <button class="btn ghost" id="clearGallery" style="display:none">Clear</button></h2>
+      <div id="gallery"><div class="empty">Your strips will show up here.</div></div>
+    </aside>
+  </main>
+
+  <div id="result">
+    <div id="resultCard">
+      <img id="stripPreview" alt="Photo strip" />
+      <div id="resultActions">
+        <h3>Nice strip! ✨</h3>
+        <p>Saved to this session's gallery.</p>
+        <p id="uploadStatus" class="ustat"></p>
+        <button class="btn primary" id="downloadBtn">⬇ Download PNG</button>
+        <button class="btn" id="againBtn">↺ Take another</button>
+        <button class="btn ghost" id="retryUpload" style="display:none">↻ Retry upload</button>
+        <button class="btn ghost" id="closeResult">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/qrcode.js"></script>
+  <script src="assets/mediapipe/selfie_segmentation.js"></script>
+<script>
+/* ============================================================================
+   PHOTOBOOTH · V0.5 — local digital photobooth. Two concerns, kept separate:
+
+     BOOTH EXPERIENCE  (sections 3–7): webcam → 3s countdown → 3/4 shots →
+       strip PNG → gallery → download. Optional on-device AI background swap.
+
+     COLLECTION SYSTEM (section 5b): after each session, POST the strip + the
+       original frames + metadata to a tiny local backend that writes them to
+       sessions/<id>/ on disk. This is a fire-and-forget "upload contract":
+       capture NEVER waits on it; the strip shows and downloads immediately;
+       if upload fails the UI says so and the local copy still works. The same
+       contract can later point at a Cloudflare Worker+R2 or Supabase unchanged.
+   ========================================================================== */
+
+/* ---------- 1) CONFIG ------------------------------------------------------ */
+const CONFIG = {
+  brandTitle:"Photobooth", brandSubtitle:"", stripFooter:"PHOTOBOOTH",
+  numPhotos:4, countdownSeconds:3, betweenShotsMs:900,
+  mirror:true, exportScale:2, frameAspect:4/3,
+  ai:{ modelSelection:1, featherPx:2, blurPx:16, defaultBg:"blur" },
+  // COLLECTION: after each session, POST {strip, frames[], meta} to an endpoint.
+  //   target:"cloud" → Supabase Edge Function (durable; survives browser clears)
+  //   target:"local" → the node/python server writing to sessions/ on disk
+  // Same JSON contract either way — this is the whole "repoint the endpoint" idea.
+  collection:{
+    enabled:true, target:"both", jpegQuality:0.9,   // "both" | "cloud" | "local"
+    local:{ endpoint:"api/session", healthUrl:"api/health" },   // relative: base-path safe
+    cloud:{
+      endpoint:"https://xjnqnxorqhobikyzshrt.supabase.co/functions/v1/session",
+      // anon key is public by design (safe in client code); RLS + the function protect writes
+      anonKey:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqbnFueG9ycWhvYmlreXpzaHJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NDkyMjUsImV4cCI6MjEwMDAyNTIyNX0.ihY85rnHCWyg7MknipFU9_bI2syCPYbwpQurVIe0scA",
+      // shared "booth key": stops drive-by spam to the upload endpoint. Not
+      // secret from guests (it ships with the page) — that's the sharing model.
+      boothKey:"lp1107-54db1816",
+    },
+  },
+  sounds:true,          // countdown beeps + shutter click (WebAudio, no files)
+  appVersion:"1.0",
+  strip:{ bg:"#ffffff", frame:"#111111", accent:"#c98a6b", text:"#111111", sub:"#8a8a8a" },
+  galleryMax:24,
+};
+
+const BGS = [
+  { id:"blur",   name:"Blur",   kind:"blur",  icon:"🌫" },
+  { id:"studio", name:"Studio", kind:"image", src:"assets/backgrounds/studio.jpg" },
+  { id:"sunset", name:"Sunset", kind:"image", src:"assets/backgrounds/sunset.jpg" },
+  { id:"beach",  name:"Beach",  kind:"image", src:"assets/backgrounds/beach.jpg" },
+  { id:"neon",   name:"Neon",   kind:"image", src:"assets/backgrounds/neon.jpg" },
+  { id:"bokeh",  name:"Bokeh",  kind:"image", src:"assets/backgrounds/bokeh.jpg" },
+  { id:"galaxy", name:"Galaxy", kind:"image", src:"assets/backgrounds/galaxy.jpg" },
+  { id:"wedding",name:"Wedding",kind:"image", src:"assets/backgrounds/wedding.jpg" },
+  { id:"color",  name:"Color",  kind:"color", color:"#2f6f4f", icon:"🎨" },
+  { id:"custom", name:"＋ Photo", kind:"custom", icon:"＋" },
+];
+
+/* Strip looks. `filter` is a CSS canvas filter applied to each photo; `footer`
+   overrides the two footer lines (Wedding uses the couple's names + date). */
+const STRIP_THEMES = [
+  { id:"classic", name:"Classic",   bg:"#ffffff", frame:"#111111", accent:"#c98a6b", text:"#111111", sub:"#8a8a8a", filter:"none",
+    footer:{ serif:false, upper:true } },
+  { id:"noir",    name:"Noir B&W",  bg:"#141414", frame:"#e9e9e9", accent:"#9a9a9a", text:"#f5f5f5", sub:"#b7b7b7", filter:"grayscale(1) contrast(1.06)",
+    footer:{ serif:false, upper:true } },
+  { id:"warm",    name:"Warm Film", bg:"#f6efe3", frame:"#5a4632", accent:"#c08a4a", text:"#4a3826", sub:"#9a836a", filter:"sepia(0.35) saturate(1.15) contrast(1.02)",
+    footer:{ serif:false, upper:true } },
+  { id:"wedding", name:"Wedding",   bg:"#faf6f0", frame:"#c2a15a", accent:"#c2a15a", text:"#4a4038", sub:"#8a7f72", filter:"none",
+    footer:{ serif:true, upper:false, l1:"Lisa & Pete", l2:"November 7th · 2026" } },
+];
+
+const FAST = new URLSearchParams(location.search).has("fast");
+const TICK_MS = FAST ? 120 : 1000;
+const GAP_MS  = FAST ? 120 : CONFIG.betweenShotsMs;
+/* Auto-pick the collection target: on localhost (dev) write BOTH local disk +
+   cloud; on a hosted/public URL there is no local server, so cloud-only.
+   Override with ?collect=local|cloud|both. */
+const _collect = new URLSearchParams(location.search).get("collect");
+const IS_LOCAL_HOST = ["localhost","127.0.0.1","::1","[::1]",""].includes(location.hostname) || location.protocol==="file:";
+if(["local","cloud","both"].includes(_collect)) CONFIG.collection.target=_collect;
+else CONFIG.collection.target = IS_LOCAL_HOST ? "both" : "cloud";
+
+/* ---------- 2) state + DOM refs ------------------------------------------- */
+const $ = (s)=>document.querySelector(s);
+const els = {
+  video:$("#video"), proc:$("#proc"), stage:$("#stage"),
+  countdown:$("#countdown"), prompt:$("#prompt"), flash:$("#flash"),
+  shotDots:$("#shotDots"), aiBadge:$("#aiBadge"),
+  startBtn:$("#startBtn"), switchCam:$("#switchCam"), bgToggle:$("#bgToggle"),
+  mirrorBtn:$("#mirrorBtn"), countSeg:$("#countSeg"), collState:$("#collState"), themeSel:$("#themeSel"),
+  bgTray:$("#bgTray"), bgChips:$("#bgChips"), bgUrl:$("#bgUrl"), bgUrlBtn:$("#bgUrlBtn"),
+  camError:$("#camError"), camErrorMsg:$("#camErrorMsg"), retryCam:$("#retryCam"),
+  gallery:$("#gallery"), clearGallery:$("#clearGallery"),
+  result:$("#result"), stripPreview:$("#stripPreview"), uploadStatus:$("#uploadStatus"),
+  downloadBtn:$("#downloadBtn"), againBtn:$("#againBtn"), retryUpload:$("#retryUpload"), closeResult:$("#closeResult"),
+  brandTitle:$("#brandTitle"),
+};
+const procCtx = els.proc.getContext("2d");
+
+const state = {
+  stream:null, devices:[], deviceIndex:0,
+  numPhotos:CONFIG.numPhotos, mirror:CONFIG.mirror, busy:false, lastStripURL:null,
+  aiOn:false, currentBg:BGS.find(b=>b.id===CONFIG.ai.defaultBg)||BGS[0], customImg:null,
+  stripTheme:"classic",
+};
+let seg=null, segReady=false, rafId=null;
+let lastSession=null, collectionAvailable=false;
+
+window.__PB = { ready:false, aiReady:false, done:false, count:0, lastStrip:null, error:null, upload:null,
+                enableAI:()=>enableAI(), setBg:(id)=>selectBg(id), setTheme:(id)=>setStripTheme(id) };
+
+/* ---------- 3) camera ----------------------------------------------------- */
+async function startCamera(deviceId=null){
+  stopStream();
+  const constraints = { audio:false, video: deviceId ? { deviceId:{ exact:deviceId } } : { facingMode:"user", width:{ideal:1280}, height:{ideal:720} } };
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    state.stream = stream; els.video.srcObject = stream;
+    await els.video.play().catch(()=>{});
+    await new Promise((r)=>{ if(els.video.videoWidth) return r(); els.video.onloadedmetadata=()=>r(); setTimeout(r,1500); });
+    sizeProc();
+    els.camError.classList.remove("show"); els.startBtn.disabled=false; window.__PB.ready=true;
+    startLoop(); await enumerateCameras();
+  } catch(err){ showCamError(err); }
+}
+function stopStream(){ if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); state.stream=null; } }
+function sizeProc(){ els.proc.width=els.video.videoWidth||1280; els.proc.height=els.video.videoHeight||720; }
+function videoReady(){ return els.video.readyState>=2 && els.video.videoWidth>0; }
+async function enumerateCameras(){
+  try { const d=await navigator.mediaDevices.enumerateDevices(); state.devices=d.filter(x=>x.kind==="videoinput").map(x=>x.deviceId); els.switchCam.style.display=state.devices.length>1?"":"none"; } catch {}
+}
+function showCamError(err){
+  window.__PB.error=String(err&&err.name||err); els.startBtn.disabled=true;
+  const n=err&&err.name; let msg="Camera not available.";
+  if(n==="NotAllowedError") msg="Camera permission was blocked. Allow it and retry.";
+  else if(n==="NotFoundError") msg="No camera found on this device.";
+  else if(n==="NotReadableError") msg="Camera is in use by another app. Close it and retry.";
+  else if(location.protocol==="file:") msg="Camera may be blocked on file://. Run via the local server (see README).";
+  els.camErrorMsg.textContent=msg; els.camError.classList.add("show");
+}
+
+/* ---------- 4) AI segmentation + compositing ------------------------------ */
+function startLoop(){ if(rafId) return; const step=()=>{ renderOnce().finally(()=>{ rafId=requestAnimationFrame(step); }); }; rafId=requestAnimationFrame(step); }
+async function renderOnce(){
+  if(!videoReady()) return;
+  if(state.aiOn && seg && segReady){ try { await seg.send({ image: els.video }); } catch(e){ window.__PB.error=String(e&&e.message||e); drawRaw(); } }
+  else drawRaw();
+}
+function drawRaw(){
+  const w=els.proc.width, h=els.proc.height, c=procCtx;
+  c.save(); if(state.mirror){ c.translate(w,0); c.scale(-1,1); }
+  c.globalCompositeOperation="source-over"; c.drawImage(els.video,0,0,w,h); c.restore();
+}
+function onSegResults(results){
+  const w=els.proc.width, h=els.proc.height, c=procCtx;
+  c.save();
+  if(state.mirror){ c.translate(w,0); c.scale(-1,1); }
+  c.globalCompositeOperation="source-over"; c.clearRect(0,0,w,h);
+  if(CONFIG.ai.featherPx>0) c.filter=`blur(${CONFIG.ai.featherPx}px)`;
+  c.drawImage(results.segmentationMask,0,0,w,h); c.filter="none";
+  c.globalCompositeOperation="source-in"; c.drawImage(results.image,0,0,w,h);
+  c.globalCompositeOperation="destination-over"; drawBackground(c,results.image,w,h);
+  c.globalCompositeOperation="source-over"; c.restore();
+}
+function drawBackground(c,image,w,h){
+  const bg=state.currentBg;
+  if(bg.kind==="blur"){ c.filter=`blur(${CONFIG.ai.blurPx}px)`; c.drawImage(image,0,0,w,h); c.filter="none"; }
+  else if(bg.kind==="color"){ c.fillStyle=bg.color||"#222"; c.fillRect(0,0,w,h); }
+  else if(bg.img){ coverDraw(c,bg.img,w,h); }
+  else { c.fillStyle="#20222c"; c.fillRect(0,0,w,h); }
+}
+function coverDraw(c,img,w,h){ const ir=img.width/img.height, r=w/h; let dw,dh,dx,dy; if(ir>r){ dh=h; dw=h*ir; dx=(w-dw)/2; dy=0; } else { dw=w; dh=w/ir; dx=0; dy=(h-dh)/2; } c.drawImage(img,dx,dy,dw,dh); }
+async function initSegmenter(){
+  if(seg) return true; if(typeof SelfieSegmentation==="undefined") return false;
+  try { seg=new SelfieSegmentation({ locateFile:(f)=>`assets/mediapipe/${f}` }); seg.setOptions({ modelSelection:CONFIG.ai.modelSelection, selfieMode:false }); seg.onResults(onSegResults); if(videoReady()) await seg.send({ image: els.video }); segReady=true; window.__PB.aiReady=true; return true; }
+  catch(e){ seg=null; segReady=false; return false; }
+}
+async function enableAI(){
+  if(location.protocol==="file:"){ showToast("Background replace needs the local server (file:// can't load the model). See README."); return false; }
+  els.bgToggle.textContent="✨ Loading model…"; els.bgToggle.disabled=true;
+  const ok=await initSegmenter(); els.bgToggle.disabled=false;
+  if(!ok){ els.bgToggle.textContent="✨ Background: Off"; showToast("Couldn't load the segmentation model — make sure assets/ sits next to this file and you're on http://localhost."); return false; }
+  state.aiOn=true; els.bgToggle.textContent="✨ Background: On"; els.bgToggle.classList.add("on");
+  els.bgTray.classList.remove("hidden"); els.aiBadge.classList.add("show"); renderBgChips(); return true;
+}
+function disableAI(){ state.aiOn=false; els.bgToggle.textContent="✨ Background: Off"; els.bgToggle.classList.remove("on"); els.bgTray.classList.add("hidden"); els.aiBadge.classList.remove("show"); }
+
+let toastT=null;
+function showToast(msg){
+  let t=$("#toast");
+  if(!t){ t=document.createElement("div"); t.id="toast"; t.style.cssText="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1b1e2b;color:#f3f4f8;border:1px solid #303445;padding:12px 16px;border-radius:12px;max-width:min(560px,92vw);font-size:13px;z-index:50;box-shadow:0 10px 40px rgba(0,0,0,.5)"; document.body.appendChild(t); }
+  t.textContent=msg; t.style.opacity="1"; clearTimeout(toastT); toastT=setTimeout(()=>{ t.style.transition="opacity .4s"; t.style.opacity="0"; },4200);
+}
+
+function preloadBackgrounds(){ BGS.forEach(b=>{ if(b.kind==="image" && b.src && !b.img){ const im=new Image(); im.onload=()=>{ b.img=im; renderBgChips(); }; im.src=b.src; } }); }
+function renderBgChips(){
+  els.bgChips.innerHTML="";
+  BGS.forEach(b=>{
+    const chip=document.createElement("div");
+    chip.className="bgchip"+(b.kind==="custom"?" custom":"")+(state.currentBg.id===b.id?" active":"");
+    const sw=document.createElement("div"); sw.className="sw";
+    if(b.kind==="image" && b.src){ sw.style.backgroundImage=`url(${b.src})`; }
+    else if(b.kind==="color"){ sw.style.background=b.color; }
+    else if(b.id==="custom" && state.customImg){ sw.style.backgroundImage=`url(${state.customImg.src})`; }
+    else { sw.textContent=b.icon||""; }
+    const lbl=document.createElement("div"); lbl.className="lbl"; lbl.textContent=b.name;
+    chip.appendChild(sw); chip.appendChild(lbl);
+    chip.addEventListener("click",()=>{ if(b.kind==="custom" && !state.customImg){ pickCustomFile(); } else { selectBg(b.id); } });
+    els.bgChips.appendChild(chip);
+  });
+}
+function selectBg(id){ const b=BGS.find(x=>x.id===id); if(!b) return; state.currentBg=b; renderBgChips(); }
+function pickCustomFile(){
+  const inp=document.createElement("input"); inp.type="file"; inp.accept="image/*";
+  inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(!f) return; const img=new Image(); img.onload=()=>{ state.customImg=img; const cb=BGS.find(x=>x.id==="custom"); cb.img=img; state.currentBg=cb; renderBgChips(); }; img.src=URL.createObjectURL(f); };
+  inp.click();
+}
+function useBgUrl(){
+  const url=els.bgUrl.value.trim(); if(!url) return;
+  const img=new Image(); img.crossOrigin="anonymous";
+  img.onload=()=>{ state.customImg=img; const cb=BGS.find(x=>x.id==="custom"); cb.img=img; state.currentBg=cb; renderBgChips(); showToast("Background set from URL ✓"); };
+  img.onerror=()=>showToast("Couldn't load that URL (or it blocks cross-origin use). Try uploading the image file instead.");
+  img.src=url;
+}
+
+/* ---------- 5) capture sequence ------------------------------------------- */
+const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+
+/* Tiny WebAudio sound effects — no audio files. The AudioContext is created
+   lazily on the first capture (a user gesture), which satisfies autoplay rules. */
+let audioCtx=null;
+function sfx(kind){
+  if(!CONFIG.sounds) return;
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==="suspended") audioCtx.resume();
+    const t=audioCtx.currentTime, o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    if(kind==="beep"){ o.frequency.value=880;  g.gain.setValueAtTime(.10,t); g.gain.exponentialRampToValueAtTime(.001,t+.09); o.start(t); o.stop(t+.10); }
+    else if(kind==="go"){ o.frequency.value=1318; g.gain.setValueAtTime(.13,t); g.gain.exponentialRampToValueAtTime(.001,t+.16); o.start(t); o.stop(t+.18); }
+    else if(kind==="shutter"){ o.type="square"; o.frequency.setValueAtTime(2200,t); o.frequency.exponentialRampToValueAtTime(300,t+.05); g.gain.setValueAtTime(.16,t); g.gain.exponentialRampToValueAtTime(.001,t+.06); o.start(t); o.stop(t+.07); }
+  }catch{ /* audio unavailable (headless etc.) — never break capture */ }
+}
+async function runSession(){
+  if(state.busy || !state.stream) return;
+  state.busy=true; setControlsEnabled(false); window.__PB.done=false; window.__PB.count=0;
+  const shots=[]; buildShotDots(state.numPhotos);
+  for(let i=0;i<state.numPhotos;i++){
+    await countdown(CONFIG.countdownSeconds); await flashAndGrab(shots);
+    markShotDone(i); window.__PB.count=shots.length;
+    if(i<state.numPhotos-1) await sleep(GAP_MS);
+  }
+  els.shotDots.classList.add("hidden");
+  const url=composeStrip(shots);
+  state.lastStripURL=url; window.__PB.lastStrip=url; window.__PB.done=true;
+  if(url){
+    saveToGallery(url); showResult(url);
+    uploadSession(buildSession(shots, url));   // COLLECTION: background upload — never blocks capture
+  }
+  state.busy=false; setControlsEnabled(true);
+}
+async function countdown(seconds){
+  for(let n=seconds;n>=1;n--){ els.countdown.textContent=n; els.countdown.classList.remove("show"); void els.countdown.offsetWidth; els.countdown.classList.add("show"); sfx("beep"); await sleep(TICK_MS); }
+  els.countdown.classList.remove("show"); els.prompt.classList.add("show"); sfx("go"); await sleep(FAST?40:250); els.prompt.classList.remove("show");
+}
+async function flashAndGrab(shots){ els.flash.classList.remove("fire"); void els.flash.offsetWidth; els.flash.classList.add("fire"); sfx("shutter"); shots.push(grabFrame()); await sleep(FAST?40:220); }
+function grabFrame(){
+  const src=els.proc, vw=src.width||1280, vh=src.height||720, target=CONFIG.frameAspect;
+  let sw=vw, sh=Math.round(vw/target); if(sh>vh){ sh=vh; sw=Math.round(vh*target); }
+  const sx=Math.round((vw-sw)/2), sy=Math.round((vh-sh)/2);
+  const outW=1200, outH=Math.round(outW/target);
+  const c=document.createElement("canvas"); c.width=outW; c.height=outH;
+  c.getContext("2d").drawImage(src,sx,sy,sw,sh,0,0,outW,outH);
+  return c;
+}
+
+/* ---------- 5b) local collection (the "upload contract") ------------------ */
+function buildSession(shots, stripUrl){
+  let frames=[];
+  try { frames = shots.map(cv=>cv.toDataURL("image/jpeg", CONFIG.collection.jpegQuality)); } catch(e){ frames=[]; }
+  return {
+    createdAt:new Date().toISOString(), numPhotos:shots.length, strip:stripUrl, frames,
+    meta:{ version:CONFIG.appVersion, mirror:state.mirror, aiEnabled:state.aiOn, stripTheme:state.stripTheme,
+           background: state.aiOn ? state.currentBg.id : "none",
+           favorite:false, tags:[], note:"",          // editable later (admin); shape exists from day one
+           frameSize: shots[0] ? [shots[0].width, shots[0].height] : null,
+           client:{ userAgent:navigator.userAgent, viewport:[window.innerWidth,window.innerHeight], dpr:window.devicePixelRatio||1 } },
+  };
+}
+// POST the session to one destination ("local" or "cloud"); never throws.
+async function postOne(kind, session){
+  const C=CONFIG.collection;
+  const endpoint = kind==="cloud" ? C.cloud.endpoint : C.local.endpoint;
+  const headers = { "Content-Type":"application/json" };
+  if(kind==="cloud"){ headers["apikey"]=C.cloud.anonKey; headers["Authorization"]="Bearer "+C.cloud.anonKey; headers["x-booth-key"]=C.cloud.boothKey; }
+  try {
+    const res=await fetch(endpoint,{ method:"POST", headers, body:JSON.stringify(session) });
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const data=await res.json(); if(!data.ok) throw new Error(data.error||"server error");
+    return { kind, ok:true, id:data.id };
+  } catch(e){ return { kind, ok:false, error:String(e.message||e) }; }
+}
+// Fire the upload(s) in the background. "both" writes local AND cloud in
+// parallel; capture never waits on either, and one failing doesn't lose the
+// other. Retry re-sends ONLY the failed destination(s) — no duplicates.
+let lastUploadMap=null;
+async function uploadSession(session, onlyTargets){
+  lastSession=session;
+  const C=CONFIG.collection;
+  if(!C.enabled){ setUploadStatus("disabled"); return; }
+  const all = C.target==="both" ? ["local","cloud"] : [C.target];
+  const targets = (onlyTargets && onlyTargets.length) ? onlyTargets : all;
+  if(!onlyTargets) lastUploadMap=null;              // fresh session → fresh slate
+  window.__PB.upload={ status:"uploading", id:null, targets:lastUploadMap?{...lastUploadMap}:{} };
+  setUploadStatus("uploading");
+  const results = await Promise.all(targets.map(k=>postOne(k, session)));
+  const byKind = lastUploadMap ? {...lastUploadMap} : {};
+  results.forEach(r=>{ byKind[r.kind]=r; });
+  lastUploadMap=byKind;
+  const anyOk = all.some(k=>byKind[k]&&byKind[k].ok);
+  const savedId = (byKind.cloud&&byKind.cloud.ok&&byKind.cloud.id) || (byKind.local&&byKind.local.ok&&byKind.local.id) || null;
+  window.__PB.upload={ status: anyOk?"saved":"failed", id:savedId, targets:byKind };
+  setUploadStatus(anyOk?"saved":"failed", savedId, byKind, all);
+}
+function setUploadStatus(s,id,byKind,targets){
+  const el=els.uploadStatus, rb=els.retryUpload; if(!el) return; if(rb) rb.style.display="none";
+  if(s==="uploading"){ el.textContent="💾 Saving session…"; el.style.color="var(--muted)"; return; }
+  if(s==="failed"){ el.textContent="⚠ Upload failed — your download & gallery copy still work."; el.style.color="var(--warn)"; if(rb) rb.style.display=""; return; }
+  if(s==="saved"){
+    if(byKind && (byKind.cloud||byKind.local)){
+      const bits=[];
+      if(byKind.cloud) bits.push("☁ cloud "+(byKind.cloud.ok?"✓":"✗"));
+      if(byKind.local) bits.push("💾 local "+(byKind.local.ok?"✓":"✗"));
+      const allOk=(targets||[]).every(k=>byKind[k]&&byKind[k].ok);
+      el.textContent="Saved — "+bits.join(" · ");
+      el.style.color=allOk?"var(--ok)":"var(--warn)";
+      if(rb && !allOk) rb.style.display="";   // a destination failed — offer retry
+    } else { el.textContent="Saved ✓"; el.style.color="var(--ok)"; }
+    return;
+  }
+  el.textContent="";
+}
+async function checkCollection(){
+  const C=CONFIG.collection;
+  if(!C.enabled){ setCollState("disabled"); return; }
+  const wantsLocal = C.target==="local"||C.target==="both";
+  let localOk=false;
+  if(wantsLocal){ try { const r=await fetch(C.local.healthUrl,{cache:"no-store"}); localOk=r.ok; } catch { localOk=false; } }
+  collectionAvailable = (C.target!=="local") || localOk;
+  if(C.target==="both") setCollState(localOk?"both":"both-nolocal");
+  else if(C.target==="cloud") setCollState("cloud");
+  else setCollState(localOk?"on":"down");
+}
+function setCollState(s){
+  const el=els.collState; if(!el) return;
+  if(s==="both"){ el.textContent="☁+💾 collection: cloud + local"; el.style.color="var(--ok)"; }
+  else if(s==="both-nolocal"){ el.textContent="☁ cloud · 💾 local off (run server)"; el.style.color="var(--warn)"; }
+  else if(s==="cloud"){ el.textContent="☁ collection: cloud"; el.style.color="var(--ok)"; }
+  else if(s==="on"){ el.textContent="● collection: on"; el.style.color="var(--ok)"; }
+  else if(s==="down"){ el.textContent="● collection: off (run the server)"; el.style.color="var(--warn)"; }
+  else { el.textContent="● collection: disabled"; el.style.color="var(--muted)"; }
+}
+
+/* ---------- 6) strip compositing ------------------------------------------ */
+/* PRINT-TRUE GEOMETRY: the strip is a real 2×6" @ 300 DPI — 600×1800 logical px,
+   exported at CONFIG.exportScale (2× → 1200×3600). 4-shot = four 4:3 cells;
+   3-shot = three SQUARE cells (same canvas, no awkward tall footer). Cells are
+   center-cropped from the captured frames. Footer is 120px in both layouts. */
+function composeStrip(shots){
+  const T=STRIP_THEMES.find(t=>t.id===state.stripTheme)||STRIP_THEMES[0];
+  const S=CONFIG.exportScale, n=shots.length;
+  const stripW=600, stripH=1800, SIDE=30, TOP=24;
+  const frameW=stripW-SIDE*2;                                   // 540
+  const frameH = n===3 ? frameW : Math.round(frameW*3/4);        // 540 sq | 405 (4:3)
+  const gap = n===3 ? 18 : 12;
+  const footerY = TOP + n*frameH + (n-1)*gap;                    // 1680 either way
+  const c=document.createElement("canvas"); c.width=stripW*S; c.height=stripH*S;
+  const ctx=c.getContext("2d"); ctx.scale(S,S); ctx.imageSmoothingQuality="high";
+  ctx.fillStyle=T.bg; ctx.fillRect(0,0,stripW,stripH);
+  const cellAR=frameW/frameH;
+  shots.forEach((shot,i)=>{
+    const y=TOP+i*(frameH+gap);
+    ctx.fillStyle=T.frame; ctx.fillRect(SIDE-3,y-3,frameW+6,frameH+6);
+    let sw=shot.width, sh=Math.round(sw/cellAR);                 // center-crop to cell aspect
+    if(sh>shot.height){ sh=shot.height; sw=Math.round(sh*cellAR); }
+    const sx=Math.round((shot.width-sw)/2), sy=Math.round((shot.height-sh)/2);
+    ctx.filter=T.filter||"none";
+    ctx.drawImage(shot, sx,sy,sw,sh, SIDE,y,frameW,frameH);
+    ctx.filter="none";
+  });
+  const F=T.footer||{};
+  ctx.textAlign="center";
+  if(T.id==="wedding"){
+    // split rule with a small heart at center
+    ctx.fillStyle=T.accent;
+    ctx.fillRect(SIDE, footerY+12, frameW/2-18, 3);
+    ctx.fillRect(stripW/2+18, footerY+12, frameW/2-18, 3);
+    ctx.font="700 15px "+serifStack();
+    ctx.fillText("♥", stripW/2, footerY+19);
+  } else {
+    ctx.fillStyle=T.accent; ctx.fillRect(SIDE, footerY+12, frameW, 3);
+  }
+  const l1=(F.l1!=null)?F.l1:(CONFIG.stripFooter||"");
+  ctx.fillStyle=T.text; ctx.font=(F.serif?"italic 700 30px "+serifStack():"700 27px "+fontStack());
+  ctx.fillText(F.upper===false?l1:l1.toUpperCase(), stripW/2, footerY+(F.serif?60:58));
+  ctx.fillStyle=T.sub; ctx.font=(F.serif?"500 15px "+serifStack():"500 14px "+fontStack());
+  ctx.fillText((F.l2!=null)?F.l2:(CONFIG.brandSubtitle||dateLabel()), stripW/2, footerY+86);
+  try { return c.toDataURL("image/png"); }
+  catch(e){ showToast("Export blocked — a cross-origin background tainted the canvas. Upload the image instead of using its URL."); return null; }
+}
+const fontStack=()=>'system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
+const serifStack=()=>'Georgia,"Times New Roman",Times,serif';
+function dateLabel(){ try { return new Date().toLocaleDateString(undefined,{year:"numeric",month:"long",day:"numeric"}); } catch { return ""; } }
+
+/* ---------- 7) gallery + storage ------------------------------------------ */
+const STORE_KEY="photobooth.v0.strips"; let memGallery=[];
+const store={ read(){ try { return JSON.parse(localStorage.getItem(STORE_KEY)||"[]"); } catch { return memGallery; } }, write(list){ memGallery=list; try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); } catch {} } };
+function saveToGallery(url){ const list=store.read(); list.unshift({url,t:Date.now()}); while(list.length>CONFIG.galleryMax) list.pop(); store.write(list); renderGallery(); }
+function renderGallery(){
+  const list=store.read(); els.clearGallery.style.display=list.length?"":"none";
+  if(!list.length){ els.gallery.innerHTML='<div class="empty">Your strips will show up here.</div>'; return; }
+  els.gallery.innerHTML="";
+  list.forEach((item,i)=>{ const div=document.createElement("div"); div.className="thumb"; div.innerHTML=`<img src="${item.url}" alt="strip ${i+1}" /><div class="dl">⬇ download</div>`; div.addEventListener("click",()=>downloadURL(item.url, stripFilename(item.t))); els.gallery.appendChild(div); });
+}
+function stripFilename(t){ const d=new Date(t||Date.now()), p=(x)=>String(x).padStart(2,"0"); return `photobooth_${state.stripTheme}_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.png`; }
+function downloadURL(url,filename){ const a=document.createElement("a"); a.href=url; a.download=filename||"photobooth.png"; document.body.appendChild(a); a.click(); a.remove(); }
+
+/* ---------- 8) UI helpers + events ---------------------------------------- */
+function buildShotDots(n){ els.shotDots.innerHTML=""; for(let i=0;i<n;i++){ const d=document.createElement("div"); d.className="dot"; els.shotDots.appendChild(d); } els.shotDots.classList.remove("hidden"); }
+function markShotDone(i){ const d=els.shotDots.children[i]; if(d) d.classList.add("done"); }
+function setControlsEnabled(on){ els.startBtn.disabled=!on||!state.stream; els.switchCam.disabled=!on; els.mirrorBtn.disabled=!on; els.bgToggle.disabled=!on; els.countSeg.querySelectorAll("button").forEach(b=>b.disabled=!on); }
+function showResult(url){ els.stripPreview.src=url; els.result.classList.add("show"); }
+function hideResult(){ els.result.classList.remove("show"); }
+function applyMirror(){ els.mirrorBtn.textContent="Mirror: "+(state.mirror?"On":"Off"); }
+function setStripTheme(id){ if(!STRIP_THEMES.some(t=>t.id===id)) return; state.stripTheme=id; if(els.themeSel) els.themeSel.value=id; }
+
+els.startBtn.addEventListener("click", runSession);
+els.retryCam.addEventListener("click", ()=>startCamera());
+els.switchCam.addEventListener("click", ()=>{ if(!state.devices.length) return; state.deviceIndex=(state.deviceIndex+1)%state.devices.length; startCamera(state.devices[state.deviceIndex]); });
+els.mirrorBtn.addEventListener("click", ()=>{ state.mirror=!state.mirror; applyMirror(); });
+if(els.themeSel) els.themeSel.addEventListener("change", (e)=>setStripTheme(e.target.value));
+els.bgToggle.addEventListener("click", ()=>{ if(state.aiOn) disableAI(); else enableAI(); });
+els.bgUrlBtn.addEventListener("click", useBgUrl);
+els.bgUrl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") useBgUrl(); });
+els.countSeg.addEventListener("click", (e)=>{ const b=e.target.closest("button[data-n]"); if(!b) return; state.numPhotos=parseInt(b.dataset.n,10); els.countSeg.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b)); });
+els.downloadBtn.addEventListener("click", ()=>state.lastStripURL&&downloadURL(state.lastStripURL, stripFilename()));
+els.againBtn.addEventListener("click", ()=>{ hideResult(); runSession(); });
+els.retryUpload.addEventListener("click", ()=>{
+  if(!lastSession) return;
+  const failed = lastUploadMap ? Object.keys(lastUploadMap).filter(k=>!lastUploadMap[k].ok) : null;
+  uploadSession(lastSession, failed && failed.length ? failed : null);   // only re-send what failed
+});
+els.closeResult.addEventListener("click", hideResult);
+els.clearGallery.addEventListener("click", ()=>{ store.write([]); renderGallery(); });
+document.querySelector("#galleryLink").addEventListener("click", ()=>{ window.open("gallery.html","_blank"); });
+document.querySelector("#qrBtn").addEventListener("click", showQR);
+/* QR of this page's URL — the share mechanism once the app is on a public URL. */
+function showQR(){
+  if(typeof qrcode==="undefined") return showToast("QR module missing (assets/qrcode.js)");
+  const url=location.origin+location.pathname;
+  let m=document.querySelector("#qrOverlay");
+  if(!m){
+    m=document.createElement("div"); m.id="qrOverlay";
+    m.style.cssText="position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(4,5,8,.85);backdrop-filter:blur(6px);cursor:pointer";
+    m.innerHTML='<div style="background:#fff;border-radius:16px;padding:22px;text-align:center;max-width:min(86vw,380px)"><img id="qrImg" alt="QR" style="width:min(64vw,300px);image-rendering:pixelated"/><div id="qrTxt" style="font:600 13px system-ui;color:#222;word-break:break-all;margin-top:10px"></div><div style="font:12px system-ui;color:#888;margin-top:6px">Scan with a phone camera · tap anywhere to close</div></div>';
+    m.addEventListener("click",()=>m.remove());
+    document.body.appendChild(m);
+  }
+  const qr=qrcode(0,"M"); qr.addData(url); qr.make();
+  m.querySelector("#qrImg").src=qr.createDataURL(8,16);
+  m.querySelector("#qrTxt").textContent=url;
+}
+document.addEventListener("keydown", (e)=>{
+  if(e.code==="Space"||e.code==="Enter"){ if(els.result.classList.contains("show")) return; if(!state.busy&&state.stream){ e.preventDefault(); runSession(); } }
+  else if(e.code==="Escape"){ hideResult(); }
+});
+
+/* ---------- boot ---------------------------------------------------------- */
+els.brandTitle.textContent=CONFIG.brandTitle; document.title=CONFIG.brandTitle+" · V"+CONFIG.appVersion;
+applyMirror(); if(els.themeSel) els.themeSel.value=state.stripTheme; renderGallery(); preloadBackgrounds(); checkCollection(); startCamera();
+</script>
+</body>
+</html>

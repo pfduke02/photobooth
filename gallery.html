@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%96%BC%3C/text%3E%3C/svg%3E" />
+<title>Photobooth · Gallery</title>
+<style>
+  :root { --bg:#0e0f13; --panel:#171922; --ink:#f3f4f8; --muted:#9aa0b4; --accent:#e7c69b; --accent-2:#c98a6b; --radius:16px; --shadow:0 10px 40px rgba(0,0,0,.45); --font:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:radial-gradient(1200px 800px at 50% -10%,#1b1e2b 0%,var(--bg) 60%); color:var(--ink); font-family:var(--font); -webkit-font-smoothing:antialiased; }
+  header { display:flex; align-items:center; gap:16px; padding:18px 24px; border-bottom:1px solid #22252f; flex-wrap:wrap; }
+  header h1 { margin:0; font-size:18px; letter-spacing:.28em; text-transform:uppercase; font-weight:600; }
+  header .sub { color:var(--muted); font-size:13px; }
+  .spacer { flex:1; }
+  a.link, .btn { font-family:var(--font); font-size:14px; font-weight:600; text-decoration:none; cursor:pointer; border:0; border-radius:10px; padding:9px 14px; background:#232634; color:var(--ink); }
+  a.link:hover, .btn:hover { filter:brightness(1.14); }
+  .btn.primary { background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#201a12; }
+  main { padding:22px 24px 60px; max-width:1200px; margin:0 auto; }
+  .empty { color:var(--muted); text-align:center; padding:60px 20px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:18px; }
+  .card { background:var(--panel); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow); cursor:pointer; border:1px solid #23262f; transition:transform .08s ease; }
+  .card:hover { transform:translateY(-2px); }
+  .card .strip { width:100%; aspect-ratio:1/2.2; object-fit:cover; display:block; background:#000; }
+  .card .meta { padding:9px 11px; }
+  .card .meta .d { font-size:12px; color:var(--ink); }
+  .card .meta .s { font-size:11px; color:var(--muted); margin-top:2px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .badge { background:#262a38; color:var(--accent); border-radius:999px; padding:1px 7px; font-size:10px; }
+  /* modal */
+  .modal { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(4,5,8,.85); backdrop-filter:blur(6px); z-index:20; padding:20px; }
+  .modal.show { display:flex; }
+  .sheet { background:var(--panel); border-radius:var(--radius); box-shadow:var(--shadow); max-width:96vw; max-height:94vh; display:flex; gap:22px; padding:20px; overflow:auto; }
+  .sheet img.big { max-height:82vh; border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,.5); }
+  .side { min-width:260px; max-width:320px; display:flex; flex-direction:column; gap:12px; }
+  .side h3 { margin:0; font-size:16px; }
+  .kv { font-size:12px; color:var(--muted); line-height:1.7; }
+  .kv b { color:var(--ink); font-weight:600; }
+  .frames { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+  .frames img { width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:6px; border:1px solid #2a2e3c; cursor:pointer; }
+  .side .row { display:flex; gap:8px; flex-wrap:wrap; }
+  .muted { color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Photobooth · Gallery</h1>
+    <span class="sub" id="count"></span>
+    <span class="spacer"></span>
+    <button class="btn" id="qrBtn" title="QR code for this gallery">📱 QR</button>
+    <button class="btn" id="refresh">↻ Refresh</button>
+    <a class="link" href="./">← Back to booth</a>
+  </header>
+  <main>
+    <div id="grid" class="grid"></div>
+    <div id="empty" class="empty" style="display:none"></div>
+  </main>
+
+  <div class="modal" id="modal">
+    <div class="sheet">
+      <img class="big" id="mStrip" alt="strip" />
+      <div class="side">
+        <h3 id="mTitle">Session</h3>
+        <div class="kv" id="mMeta"></div>
+        <div class="row">
+          <a class="btn primary" id="mDownload" download>⬇ Strip PNG</a>
+          <button class="btn" id="mSheet">⬇ Contact sheet</button>
+        </div>
+        <div class="muted">Original frames (click to download):</div>
+        <div class="frames" id="mFrames"></div>
+        <div class="row"><button class="btn" id="mClose">Close</button></div>
+      </div>
+    </div>
+  </div>
+
+<script src="assets/qrcode.js"></script>
+<script>
+const $ = (s)=>document.querySelector(s);
+let sessions = [];
+
+// Cloud gallery: reads sessions from Supabase. Add ?local=1 to the URL to read
+// the local server's /api/sessions instead.
+const CLOUD = {
+  enabled: true,
+  url: "https://xjnqnxorqhobikyzshrt.supabase.co",
+  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqbnFueG9ycWhvYmlreXpzaHJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NDkyMjUsImV4cCI6MjEwMDAyNTIyNX0.ihY85rnHCWyg7MknipFU9_bI2syCPYbwpQurVIe0scA",
+  bucket: "sessions",
+};
+const USE_CLOUD = CLOUD.enabled && !new URLSearchParams(location.search).has("local");
+const pubUrl = (p)=>`${CLOUD.url}/storage/v1/object/public/${CLOUD.bucket}/${p}`;
+
+function fmtDate(iso){
+  if(!iso) return "unknown date";
+  try { return new Date(iso).toLocaleString(undefined,{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"}); }
+  catch { return iso; }
+}
+
+async function load(){
+  if(USE_CLOUD){
+    try {
+      const res = await fetch(`${CLOUD.url}/rest/v1/sessions?select=*&order=created_at.desc`, { headers:{ apikey:CLOUD.anonKey, Authorization:"Bearer "+CLOUD.anonKey } });
+      if(!res.ok) throw new Error("HTTP "+res.status);
+      const rows = await res.json();
+      sessions = rows.map(r=>({ id:r.id, createdAt:r.created_at, numPhotos:r.num_photos, background:r.background, strip:r.strip_path?pubUrl(r.strip_path):null, frames:(r.frame_paths||[]).map(pubUrl) }));
+    } catch(e){ return showEmpty("Can't reach the cloud gallery (network?). It reads from your Supabase project."); }
+  } else {
+    try { const data = await (await fetch("/api/sessions",{cache:"no-store"})).json(); sessions = (data && data.sessions) || []; }
+    catch(e){ return showEmpty("Can't reach the local collection server. Start it with <code>node server.mjs</code> and open http://localhost:8099/gallery.html?local=1."); }
+  }
+  $("#count").textContent = sessions.length ? `${sessions.length} session${sessions.length>1?"s":""}` : "";
+  render();
+}
+function showEmpty(html){ $("#grid").innerHTML=""; const e=$("#empty"); e.style.display="block"; e.innerHTML=html; }
+
+function render(){
+  const grid=$("#grid"), empty=$("#empty");
+  if(!sessions.length){ return showEmpty("No sessions yet — take some photos in the booth and they'll appear here."); }
+  empty.style.display="none"; grid.innerHTML="";
+  sessions.forEach((s,i)=>{
+    const card=document.createElement("div"); card.className="card";
+    const bg = s.background && s.background!=="none" ? `<span class="badge">${s.background}</span>` : "";
+    card.innerHTML = `<img class="strip" loading="lazy" src="${s.strip||""}" alt="${s.id}" />
+      <div class="meta"><div class="d">${fmtDate(s.createdAt)}</div>
+      <div class="s">${s.numPhotos} shots ${bg}</div></div>`;
+    card.addEventListener("click",()=>openDetail(i));
+    grid.appendChild(card);
+  });
+}
+
+function openDetail(i){
+  const s=sessions[i];
+  $("#mStrip").src = s.strip||"";
+  $("#mTitle").textContent = s.id;
+  $("#mMeta").innerHTML = `<div><b>When:</b> ${fmtDate(s.createdAt)}</div>
+    <div><b>Shots:</b> ${s.numPhotos}</div>
+    <div><b>Background:</b> ${s.background||"none"}</div>
+    <div><b>Folder:</b> sessions/${s.id}/</div>`;
+  const dl=$("#mDownload"); dl.href=s.strip||"#"; dl.download=`${s.id}_strip.png`;
+  const fr=$("#mFrames"); fr.innerHTML="";
+  s.frames.forEach((f,idx)=>{ const im=document.createElement("img"); im.src=f; im.title=`frame-${idx+1}`; im.addEventListener("click",()=>downloadUrl(f,`${s.id}_frame-${idx+1}.jpg`)); fr.appendChild(im); });
+  $("#mSheet").onclick=()=>contactSheet(s);
+  $("#modal").classList.add("show");
+}
+function closeDetail(){ $("#modal").classList.remove("show"); }
+
+function downloadUrl(url,name){ const a=document.createElement("a"); a.href=url; a.download=name||"download"; document.body.appendChild(a); a.click(); a.remove(); }
+
+// Compose the original frames side-by-side into one PNG (a contact sheet).
+async function contactSheet(s){
+  if(!s.frames.length) return;
+  const imgs=await Promise.all(s.frames.map(src=>new Promise((res,rej)=>{ const im=new Image(); im.crossOrigin="anonymous"; im.onload=()=>res(im); im.onerror=rej; im.src=src; })));
+  const fw=imgs[0].naturalWidth, fh=imgs[0].naturalHeight, pad=20, gap=14;
+  const c=document.createElement("canvas");
+  c.width = pad*2 + imgs.length*fw + (imgs.length-1)*gap; c.height = pad*2 + fh;
+  const ctx=c.getContext("2d"); ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,c.width,c.height);
+  imgs.forEach((im,i)=>ctx.drawImage(im, pad + i*(fw+gap), pad, fw, fh));
+  c.toBlob((b)=>{ const u=URL.createObjectURL(b); downloadUrl(u,`${s.id}_contact-sheet.png`); setTimeout(()=>URL.revokeObjectURL(u),4000); }, "image/png");
+}
+
+$("#refresh").addEventListener("click", load);
+$("#qrBtn").addEventListener("click", ()=>{
+  if(typeof qrcode==="undefined") return;
+  const url=location.origin+location.pathname;
+  let m=$("#qrOverlay");
+  if(!m){
+    m=document.createElement("div"); m.id="qrOverlay";
+    m.style.cssText="position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(4,5,8,.85);backdrop-filter:blur(6px);cursor:pointer";
+    m.innerHTML='<div style="background:#fff;border-radius:16px;padding:22px;text-align:center;max-width:min(86vw,380px)"><img id="qrImg" alt="QR" style="width:min(64vw,300px);image-rendering:pixelated"/><div id="qrTxt" style="font:600 13px system-ui;color:#222;word-break:break-all;margin-top:10px"></div><div style="font:12px system-ui;color:#888;margin-top:6px">Scan with a phone camera · tap anywhere to close</div></div>';
+    m.addEventListener("click",()=>m.remove());
+    document.body.appendChild(m);
+  }
+  const qr=qrcode(0,"M"); qr.addData(url); qr.make();
+  m.querySelector("#qrImg").src=qr.createDataURL(8,16);
+  m.querySelector("#qrTxt").textContent=url;
+});
+$("#mClose").addEventListener("click", closeDetail);
+$("#modal").addEventListener("click",(e)=>{ if(e.target===$("#modal")) closeDetail(); });
+document.addEventListener("keydown",(e)=>{ if(e.key==="Escape") closeDetail(); });
+load();
+</script>
+</body>
+</html>
