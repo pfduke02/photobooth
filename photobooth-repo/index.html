@@ -47,8 +47,9 @@
   #camError.show { display:flex; }
   #camError .big { font-size:40px; }
 
-  /* Retake review overlay */
-  #review { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px; background:rgba(10,11,16,.9); backdrop-filter:blur(8px); z-index:6; padding:18px; }
+  /* Retake review overlay — fixed (viewport) rather than stage-scoped: on
+     phones the stage is short and was clipping the rail/restyle/confirm. */
+  #review { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; justify-content:safe center; gap:14px; background:rgba(10,11,16,.94); backdrop-filter:blur(8px); z-index:18; padding:18px; overflow-y:auto; }
   #review.show { display:flex; }
   #review .rvTitle { color:#fff; font-size:clamp(14px,2.4vw,18px); font-weight:700; text-align:center; }
   #rvThumbs { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; max-width:92%; }
@@ -70,8 +71,16 @@
   .rvTheme .nm { color:var(--muted); font-size:10px; font-weight:600; margin-top:3px; }
   .rvTheme.sel .nm { color:var(--accent); }
   #rvBoom { width:84px; border-radius:10px; border:2px solid #3a3f52; display:none; }
+  #rvBoomLbl { display:none; color:#cfd3e0; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
 
-  #controls { margin-top:14px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  #controls { margin-top:14px; display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; }
+  #startBtn { font-size:19px; padding:16px 32px; border-radius:14px; }
+  #startBtn:not(:disabled) { animation:startPulse 2.4s ease-in-out infinite; }
+  @keyframes startPulse { 0%,100% { box-shadow:0 0 0 0 rgba(201,138,107,.45); } 55% { box-shadow:0 0 0 12px rgba(201,138,107,0); } }
+  .ctlGroup { display:flex; flex-direction:column; gap:4px; }
+  .ctlLbl { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:700; padding-left:2px; }
+  #utilRow { margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .btn.sm { font-size:13px; padding:8px 12px; opacity:.85; }
   .btn { appearance:none; border:0; cursor:pointer; font-family:var(--font); font-size:15px; font-weight:600; padding:12px 18px; border-radius:12px; background:#232634; color:var(--ink); transition:transform .06s ease, filter .15s ease, background .15s ease; }
   .btn:hover { filter:brightness(1.12); }
   .btn:active { transform:translateY(1px); }
@@ -122,7 +131,7 @@
 <body>
   <header>
     <h1 id="brandTitle">Photobooth</h1>
-    <p id="brandSub">V2.3 · booth · AI props + restyle · cloud + local collection · gallery</p>
+    <p id="brandSub">V2.4 · booth · AI props + restyle · cloud + local collection · gallery</p>
   </header>
 
   <main>
@@ -146,25 +155,32 @@
           <div id="rvThumbs"></div>
           <div id="rvRail"><div class="rvLbl">Strip style — live preview</div></div>
           <div id="rvStyle"></div>
+          <div id="rvBoomLbl">🌀 Your boomerang</div>
           <canvas id="rvBoom" width="640" height="480"></canvas>
           <button class="btn primary" id="rvOk">✓ Make my strip</button>
         </div>
       </div>
 
       <div id="controls">
-        <button class="btn primary" id="startBtn" disabled>Start</button>
-        <button class="btn ghost" id="switchCam" style="display:none">⇆ Camera</button>
-        <button class="btn ghost" id="bgToggle">✨ Background: Off</button>
-        <!-- Phase 2A: face props — the guest's second (and last) choice. -->
-        <div class="seg" id="propSeg" title="Face props — drawn live on every face">
-          <button data-prop="none" class="active">🪄 off</button>
-          <button data-prop="crown" title="Crown">👑</button>
-          <button data-prop="tophat" title="Top hat">🎩</button>
-          <button data-prop="glasses" title="Sunglasses">🕶</button>
-          <button data-prop="flowers" title="Flower crown">🌸</button>
-          <button data-prop="bowtie" title="Bow tie">🎀</button>
-          <button data-prop="hearts" title="Heart eyes">😍</button>
-          <button data-prop="surprise" title="Surprise — every face gets a random prop, new roll every shot">🎲</button>
+        <!-- V2.4 layout: ONE big obvious action (Start), then the guest's two
+             labeled choices. Pete-facing utilities live in #utilRow below. -->
+        <button class="btn primary" id="startBtn" disabled>📸 Start</button>
+        <div class="ctlGroup">
+          <div class="ctlLbl">Background</div>
+          <button class="btn ghost" id="bgToggle">✨ Off</button>
+        </div>
+        <div class="ctlGroup">
+          <div class="ctlLbl">Props</div>
+          <div class="seg" id="propSeg" title="Face props — drawn live on every face">
+            <button data-prop="none" class="active">✖</button>
+            <button data-prop="crown" title="Crown">👑</button>
+            <button data-prop="tophat" title="Top hat">🎩</button>
+            <button data-prop="glasses" title="Sunglasses">🕶</button>
+            <button data-prop="flowers" title="Flower crown">🌸</button>
+            <button data-prop="bowtie" title="Bow tie">🎀</button>
+            <button data-prop="hearts" title="Heart eyes">😍</button>
+            <button data-prop="surprise" title="Surprise — every face gets a random prop, new roll every shot">🎲</button>
+          </div>
         </div>
         <!-- Simplified guest UI: Background + Props are the only choices. Shots
              fixed at 4, mirror on, theme via the review rail — remove
@@ -185,11 +201,14 @@
             <option value="comic">Comic</option>
           </select>
         </label>
-        <button class="btn ghost" id="galleryLink" title="Browse saved sessions">🖼 Gallery</button>
-        <button class="btn ghost" id="qrBtn" title="QR code for this page">📱 QR</button>
-        <span id="collState" class="hint" title="Local collection backend status">● collection: …</span>
         <span class="spacer"></span>
         <span class="hint">Press <kbd>Space</kbd> to start</span>
+      </div>
+      <div id="utilRow">
+        <button class="btn ghost sm" id="galleryLink" title="Browse saved sessions">🖼 Gallery</button>
+        <button class="btn ghost sm" id="qrBtn" title="QR code for this page">📱 QR</button>
+        <button class="btn ghost sm" id="switchCam" style="display:none">⇆ Camera</button>
+        <span id="collState" class="hint" title="Where sessions are being saved">● collection: …</span>
       </div>
 
       <div id="bgTray" class="hidden">
@@ -213,7 +232,6 @@
       <img id="stripPreview" alt="Photo strip" />
       <div id="resultActions">
         <h3>Nice strip! ✨</h3>
-        <p>Saved to this session's gallery.</p>
         <p id="uploadStatus" class="ustat"></p>
         <div id="stripQr" style="display:none; text-align:center; background:#fff; border-radius:12px; padding:10px; margin:2px 0 6px;">
           <img id="stripQrImg" alt="QR code for this strip" style="width:132px; height:132px; image-rendering:pixelated; display:block; margin:0 auto;" />
@@ -235,8 +253,8 @@
   <!-- ?v= busts any stale immutable-cached copy (early deploys served missing
        asset paths as index.html with 200 + our immutable header — Chrome then
        kept executing cached HTML as JS until the URL changed). Bump with appVersion. -->
-  <script src="assets/qrcode.js?v=2.2"></script>
-  <script src="assets/mediapipe/selfie_segmentation.js?v=2.2"></script>
+  <script src="assets/qrcode.js?v=2.4"></script>
+  <script src="assets/mediapipe/selfie_segmentation.js?v=2.4"></script>
 <script>
 /* ============================================================================
    PHOTOBOOTH · V0.5 — local digital photobooth. Two concerns, kept separate:
@@ -300,7 +318,7 @@ const CONFIG = {
   // the cloud copy, and the gallery all carry the restyled frame with zero
   // contract changes. Capture NEVER depends on the sidecar.
   restyle:{ enabled:true, endpoint:"http://127.0.0.1:8123", timeoutMs:15000 },
-  appVersion:"2.3",
+  appVersion:"2.4",
   strip:{ bg:"#ffffff", frame:"#111111", accent:"#c98a6b", text:"#111111", sub:"#8a8a8a" },
   galleryMax:24,
 };
@@ -463,13 +481,13 @@ async function initSegmenter(){
 }
 async function enableAI(){
   if(location.protocol==="file:"){ showToast("Background replace needs the local server (file:// can't load the model). See README."); return false; }
-  els.bgToggle.textContent="✨ Loading model…"; els.bgToggle.disabled=true;
+  els.bgToggle.textContent="✨ Loading…"; els.bgToggle.disabled=true;
   const ok=await initSegmenter(); els.bgToggle.disabled=false;
-  if(!ok){ els.bgToggle.textContent="✨ Background: Off"; showToast("Couldn't load the segmentation model — make sure assets/ sits next to this file and you're on http://localhost."); return false; }
-  state.aiOn=true; els.bgToggle.textContent="✨ Background: On"; els.bgToggle.classList.add("on");
+  if(!ok){ els.bgToggle.textContent="✨ Off"; showToast("Couldn't load the segmentation model — make sure assets/ sits next to this file and you're on http://localhost."); return false; }
+  state.aiOn=true; els.bgToggle.textContent="✨ On"; els.bgToggle.classList.add("on");
   els.bgTray.classList.remove("hidden"); els.aiBadge.classList.add("show"); renderBgChips(); return true;
 }
-function disableAI(){ state.aiOn=false; els.bgToggle.textContent="✨ Background: Off"; els.bgToggle.classList.remove("on"); els.bgTray.classList.add("hidden"); els.aiBadge.classList.remove("show"); }
+function disableAI(){ state.aiOn=false; els.bgToggle.textContent="✨ Off"; els.bgToggle.classList.remove("on"); els.bgTray.classList.add("hidden"); els.aiBadge.classList.remove("show"); }
 
 /* ---------- 4b) face props (Phase 2A) ------------------------------------- */
 /* Landmarks come from MediaPipe FaceLandmarker (loaded lazily from the CDN on
@@ -845,9 +863,9 @@ function openReview(shots, boomFrames){
     }
     /* Looping ping-pong preview of the boomerang frames. */
     function startBoomPreview(){
-      const bc=document.querySelector("#rvBoom");
-      if(!boomFrames || boomFrames.length<3){ bc.style.display="none"; return; }
-      bc.style.display="block"; const bx=bc.getContext("2d");
+      const bc=document.querySelector("#rvBoom"), bl=document.querySelector("#rvBoomLbl");
+      if(!boomFrames || boomFrames.length<3){ bc.style.display="none"; bl.style.display="none"; return; }
+      bc.style.display="block"; bl.style.display="block"; const bx=bc.getContext("2d");
       const seq=[...boomFrames, ...boomFrames.slice(1,-1).reverse()];
       let i=0, last=0; const step=(ts)=>{ if(done) return; if(ts-last>1000/18){ bx.drawImage(seq[i%seq.length],0,0); i++; last=ts; } boomRaf=requestAnimationFrame(step); };
       boomRaf=requestAnimationFrame(step);

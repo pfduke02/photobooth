@@ -147,6 +147,13 @@ hardware + a print queue) · ✅ **cloud audit**: 0 security lints, 0
 performance lints, 11 sessions (app versions 1.0/1.3/2.0), 61 files / 65 MB
 in storage, 1 known orphan prefix (Pete's 🧹 admin button clears it).
 
+**V2.4 (shipped) — design polish, per Pete ("make easy and intuitive"):**
+✅ idle screen: big pulsing Start, labeled Background/Props guest choices,
+utilities demoted below · ✅ review full-screen (was clipped on phones —
+theme rail and confirm were unreachable), scroll-safe, boomerang labeled ·
+✅ result text de-duplicated · ✅ `test_links.mjs` link/asset audit (97
+checks) in the permanent suite. 11 suites green.
+
 ## Next steps (agreed order)
 
 1. **Phase 2B stretch** — swap a real diffusion img2img (Stable Diffusion /

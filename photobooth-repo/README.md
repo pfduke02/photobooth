@@ -1,4 +1,4 @@
-# Photobooth · V2.3
+# Photobooth · V2.4
 
 A browser-based digital photobooth with **cloud + local collection**, live at
 **https://photobooth-c7s.pages.dev/**.
@@ -79,6 +79,17 @@ Headless testing: `?fakeface=1` feeds synthetic landmarks so the prop
 pipeline is testable without a real face (`test_props.mjs`).
 **V2.0.1** makes toasts click-transparent (a faded toast was invisibly
 blocking the result screen's Close button).
+
+**V2.4 — design polish + link audit:** the idle screen now reads like a
+booth — one **big pulsing 📸 Start**, the guest's two choices labeled
+(**BACKGROUND** / **PROPS**), and Pete-facing utilities (Gallery / QR /
+collection status) demoted to a quiet row below. The **review screen is
+full-screen** (it was clipped to the camera box on phones, hiding the theme
+rail and confirm button), scrolls safely on small screens, and the boomerang
+preview got a label. Result modal de-duplicated ("saved" is said once, by the
+live status line). **`test_links.mjs`** joins the suite: crawls both pages,
+verifies ~97 same-origin links/assets (incl. every backdrop + mediapipe model
+file) return 200, health endpoint is ok, and unknown paths 404.
 
 **V2.3 — gallery upgrades:** **🔎 text search** in the filter bar — matches
 id, notes, tags, theme, background, props (incl. per-shot surprise rolls),
@@ -179,7 +190,7 @@ node server.mjs &
 node test.mjs && node test_collection.mjs && node test_gallery.mjs \
   && node test_themes.mjs && node test_both.mjs && node test_retake.mjs \
   && node test_admin.mjs && node test_boomerang.mjs && node test_props.mjs \
-  && node test_restyle.mjs
+  && node test_restyle.mjs && node test_links.mjs
 ```
 
 (`test_restyle.mjs` spawns the real Python sidecar — true end-to-end.)
