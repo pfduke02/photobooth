@@ -1,7 +1,7 @@
-# Photobooth · V1.0
+# Photobooth · V2.0
 
-A browser-based digital photobooth with **cloud + local collection**, ready to
-host on a **public URL**.
+A browser-based digital photobooth with **cloud + local collection**, live at
+**https://photobooth-c7s.pages.dev/**.
 
 **V1.0 (Sprint 1):** print-true strips — exactly **2×6" @ 300 DPI** (exported
 2×, 1200×3600; square cells for 3-shot) so future printing needs no resample;
@@ -21,12 +21,16 @@ the local `sessions/` folder shape — idempotent, stdlib-only:
 python3 sync.py     # pull strip + frames + metadata.json for every session
 ```
 
-Drive backup: keep this folder (or `sessions/`) inside your Google Drive folder
-and the Drive desktop app syncs each run automatically.
+`sync.py --install-auto` installs a launchd agent that runs the sync every 30
+minutes (log: `sync.log`); it also keeps a flat `strips/` folder (every strip
+as one PNG) and copies strips into a local **Google Drive** "Photobooth
+Strips" folder when Drive for desktop is installed.
 
-**Updating the live site** (direct-upload project): Cloudflare → the Pages
-project → **Deployments → Create deployment** → drop the new
-`photobooth-repo.zip`.
+**Updating the live site** (git-connected): replace the `photobooth-repo/`
+folder in **github.com/pfduke02/photobooth** with the new unzipped
+`photobooth-repo` (GitHub → Add file → Upload files → drag the folder →
+Commit). Cloudflare Pages auto-builds from `main` (build output directory
+`photobooth-repo`).
 
 **V1.2:** simplified guest UI — Background is the only choice; 4 shots fixed
 (shots/mirror/theme choosers hidden, each a one-line restore).
@@ -41,6 +45,38 @@ session** (files + record, two-tap confirm), and **🧹 clean orphans** (storage
 folders with no session record). Backed by a service-role `admin` Edge
 Function gated by `x-admin-key` — the key ships only to Pete, never in the app.
 **Gallery date filters** (from/to) join the filter bar.
+
+**V1.4 — Phase 1 complete (7/7):** **Boomerang** — after the last shot the
+booth samples ~1.4s of live frames (AI backdrop included), shows a ping-pong
+preview on the review screen, encodes an mp4/webm with `MediaRecorder` while
+you review, saves it with the session (local + cloud), and gives it its own
+save/share button on the result screen; it also plays in the gallery detail
+view. **Live theme previews** — the review screen shows four real mini-strips
+of *your* shots, one per theme; tap to choose (theme choice is back in the
+guest flow). **Beefier flash**, review auto-continue **12s → 7s**, and the QR
+caption now says how to save on a phone (press & hold → "Save to Photos").
+
+**V2.0 — Phase 2A, the AI pack begins:** **Face props** — a second guest
+picker (👑 crown · 🎩 top hat · 🕶 sunglasses · 🎲 surprise = a new random
+prop every shot). Landmarks come from MediaPipe **FaceLandmarker**, loaded at
+runtime from the CDN the first time someone picks a prop (nothing on page
+load; a failed load just disables props — capture never depends on it). Props
+track up to **4 faces**, render live in the preview, and bake into shots,
+retakes, and the boomerang. 👑/🎩 are emoji sized ≈ head width; 🕶 is
+vector-drawn so the lenses align exactly with the eyes. The chosen prop (and
+the per-shot surprise rolls) land in metadata, the gallery gets a **Prop
+filter** + badges. **Two new strip styles** in the review rail: **Pop Art**
+and **Cyanotype** (pure canvas filters, live-previewed like the rest).
+**Result screen reworked** per Pete: saving is automatic, so "Take another"
+is the primary button, download is a small ghost button ("⬇ Download to this
+device" / share sheet on phones), and the QR caption carries full
+instructions (scan → strip opens on your phone → press & hold → Save to
+Photos). Review auto-continue **7s → 5s**. **Live-site cache fix:** asset
+URLs are versioned (`?v=`) and a real `404.html` disables the Pages SPA
+fallback — early deploys had let browsers immutable-cache the homepage HTML
+*as* the model script, which broke background replace until a hard reload.
+Headless testing: `?fakeface=1` feeds synthetic landmarks so the prop
+pipeline is testable without a real face (`test_props.mjs`).
 
 - **Booth** — webcam → 3s countdown → 3/4 photos → strip PNG → gallery →
   download. On-device AI background replace (incl. the Lisa & Pete wedding
@@ -105,10 +141,12 @@ per-session IDs. Lock down later with signed URLs/auth if wanted.
 npm install playwright
 node server.mjs &
 node test.mjs && node test_collection.mjs && node test_gallery.mjs \
-  && node test_themes.mjs && node test_both.mjs
+  && node test_themes.mjs && node test_both.mjs && node test_retake.mjs \
+  && node test_admin.mjs && node test_boomerang.mjs && node test_props.mjs
 ```
 
 ## What's next
 
-Central Park backdrop (needs the photo file); booth polish (boomerang/GIF,
-sounds); auth/locking for the gallery. See `ROADMAP.md`.
+Phase 2B — a local img2img restyle (the GenAI learning goal); gallery text
+search; printing (strips are already print-true 2×6" @300dpi). Central Park
+backdrop still needs the photo file. See `ROADMAP.md`.

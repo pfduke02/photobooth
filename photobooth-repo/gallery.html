@@ -62,6 +62,7 @@
     <select id="fBg" class="fsel"><option value="">Background: all</option></select>
     <select id="fAi" class="fsel"><option value="">AI: all</option><option value="on">AI: on</option><option value="off">AI: off</option></select>
     <select id="fShots" class="fsel"><option value="">Shots: all</option><option value="3">3 shots</option><option value="4">4 shots</option></select>
+    <select id="fProp" class="fsel"><option value="">Prop: all</option></select>
     <label id="fFavLbl"><input type="checkbox" id="fFav" /> ♥ favorites only</label>
     <input type="date" id="fFrom" class="fsel" title="From date" />
     <input type="date" id="fTo" class="fsel" title="To date" />
@@ -84,6 +85,7 @@
         </div>
         <div class="muted">Original frames (click to download):</div>
         <div class="frames" id="mFrames"></div>
+        <video id="mBoom" controls loop muted autoplay playsinline style="display:none; width:100%; border-radius:8px;"></video>
         <div id="adminBox" style="display:none; border-top:1px solid #262a38; padding-top:10px; display:none; flex-direction:column; gap:8px;">
           <div class="muted" style="letter-spacing:.1em; text-transform:uppercase;">Admin</div>
           <div class="row">
@@ -99,7 +101,7 @@
     </div>
   </div>
 
-<script src="assets/qrcode.js"></script>
+<script src="assets/qrcode.js?v=2.0"></script>
 <script>
 const $ = (s)=>document.querySelector(s);
 let sessions = [];
@@ -156,7 +158,9 @@ async function load(){
       const rows = await res.json();
       sessions = rows.map(r=>({ id:r.id, createdAt:r.created_at, numPhotos:r.num_photos, background:r.background,
         stripTheme:r.strip_theme||null, aiEnabled:r.ai_enabled, favorite:!!r.favorite, tags:r.tags||[], note:r.note||"",
-        strip:r.strip_path?pubUrl(r.strip_path):null, frames:(r.frame_paths||[]).map(pubUrl) }));
+        prop:(r.meta&&r.meta.prop)||null, meta:r.meta||{},
+        strip:r.strip_path?pubUrl(r.strip_path):null, frames:(r.frame_paths||[]).map(pubUrl),
+        boomerang:(r.meta&&r.meta.boomerangPath)?pubUrl(r.meta.boomerangPath):null }));
     } catch(e){ return showEmpty("Can't reach the cloud gallery (network?). It reads from your Supabase project."); }
   } else {
     try {
@@ -164,6 +168,7 @@ async function load(){
       sessions = ((data && data.sessions) || []).map(s=>({ ...s,
         stripTheme:(s.meta&&s.meta.stripTheme)||null,
         aiEnabled:s.meta?!!s.meta.aiEnabled:null,
+        prop:(s.meta&&s.meta.prop)||null,
         favorite:!!(s.meta&&s.meta.favorite), tags:(s.meta&&s.meta.tags)||[], note:(s.meta&&s.meta.note)||"" }));
     }
     catch(e){ return showEmpty("Can't reach the local collection server. Start it with <code>node server.mjs</code> and open http://localhost:8099/gallery.html?local=1."); }
@@ -184,14 +189,16 @@ function buildFilterOptions(){
   };
   fill($("#fTheme"), sessions.map(s=>s.stripTheme), "Theme");
   fill($("#fBg"),    sessions.map(s=>s.background), "Background");
+  fill($("#fProp"),  sessions.map(s=>s.prop&&s.prop!=="none"?s.prop:null), "Prop");
 }
 function applyFilters(){
   const th=$("#fTheme").value, bg=$("#fBg").value, ai=$("#fAi").value,
-        ns=$("#fShots").value, fav=$("#fFav").checked;
+        ns=$("#fShots").value, fav=$("#fFav").checked, pr=$("#fProp").value;
   const from=$("#fFrom").value, to=$("#fTo").value;
   view = sessions.filter(s=>
     (!th || s.stripTheme===th) &&
     (!bg || s.background===bg) &&
+    (!pr || s.prop===pr) &&
     (!ai || (ai==="on" ? s.aiEnabled===true : s.aiEnabled===false)) &&
     (!ns || String(s.numPhotos)===ns) &&
     (!fav || s.favorite) &&
@@ -212,6 +219,7 @@ function render(){
     const bits=[];
     if(s.stripTheme) bits.push(`<span class="badge">${s.stripTheme}</span>`);
     if(s.background && s.background!=="none") bits.push(`<span class="badge">${s.background}</span>`);
+    if(s.prop && s.prop!=="none") bits.push(`<span class="badge">${s.prop==="crown"?"👑":s.prop==="tophat"?"🎩":s.prop==="glasses"?"🕶":"🎲"} ${s.prop}</span>`);
     if(s.favorite) bits.push(`<span class="badge">♥</span>`);
     card.innerHTML = `<img class="strip" loading="lazy" src="${s.strip||""}" alt="${s.id}" />
       <div class="meta"><div class="d">${fmtDate(s.createdAt)}</div>
@@ -230,6 +238,7 @@ function openDetail(i){
     <div><b>Theme:</b> ${s.stripTheme||"—"}</div>
     <div><b>Background:</b> ${s.background||"none"}</div>
     <div><b>AI:</b> ${s.aiEnabled===true?"on":s.aiEnabled===false?"off":"—"}</div>
+    ${s.prop&&s.prop!=="none"?`<div><b>Prop:</b> ${s.prop}${s.prop==="surprise"&&s.meta&&s.meta.propShots?` (${s.meta.propShots.join(", ")})`:""}</div>`:""}
     ${s.tags&&s.tags.length?`<div><b>Tags:</b> ${s.tags.join(", ")}</div>`:""}
     ${s.note?`<div><b>Note:</b> ${s.note}</div>`:""}
     <div><b>Folder:</b> sessions/${s.id}/</div>`;
@@ -237,6 +246,8 @@ function openDetail(i){
   const fr=$("#mFrames"); fr.innerHTML="";
   s.frames.forEach((f,idx)=>{ const im=document.createElement("img"); im.src=f; im.title=`frame-${idx+1}`; im.addEventListener("click",()=>downloadUrl(f,`${s.id}_frame-${idx+1}.jpg`)); fr.appendChild(im); });
   $("#mSheet").onclick=()=>contactSheet(s);
+  const mb=$("#mBoom");
+  if(s.boomerang){ mb.src=s.boomerang; mb.style.display=""; } else { mb.removeAttribute("src"); mb.style.display="none"; }
   const ab=$("#adminBox");
   if(IS_ADMIN){
     ab.style.display="flex";
@@ -277,7 +288,7 @@ async function contactSheet(s){
 }
 
 $("#refresh").addEventListener("click", load);
-["fTheme","fBg","fAi","fShots","fFrom","fTo"].forEach(id=>$("#"+id).addEventListener("change", applyFilters));
+["fTheme","fBg","fAi","fShots","fProp","fFrom","fTo"].forEach(id=>$("#"+id).addEventListener("change", applyFilters));
 $("#fFav").addEventListener("change", applyFilters);
 if(IS_ADMIN){
   $("#adminBadge").style.display="";

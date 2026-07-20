@@ -34,6 +34,7 @@ const MIME = {
   '.css':'text/css', '.json':'application/json', '.png':'image/png',
   '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.webp':'image/webp',
   '.svg':'image/svg+xml', '.wasm':'application/wasm', '.tflite':'application/octet-stream',
+  '.webm':'video/webm', '.mp4':'video/mp4',
   '.binarypb':'application/octet-stream', '.data':'application/octet-stream',
 };
 
@@ -74,6 +75,16 @@ async function saveSession(payload){
     await fs.writeFile(path.join(dir,name), f.buf); files.push(name);
   }
 
+  let boomName = null;
+  if (payload.boomerang) {
+    const boom = dataUrlToBuffer(payload.boomerang);
+    if (boom && /^video\/(webm|mp4)$/.test(boom.mime)) {
+      boomName = 'boomerang.' + boom.mime.split('/')[1];
+      await fs.writeFile(path.join(dir, boomName), boom.buf);
+      files.push(boomName);
+    }
+  }
+
   const metadata = {
     id,
     createdAt: payload.createdAt || new Date().toISOString(),
@@ -82,6 +93,7 @@ async function saveSession(payload){
     strip: strip ? 'strip.png' : null,
     frames: files.filter((n) => n.startsWith('frame-')),
     ...(payload.meta || {}),
+    ...(boomName ? { boomerangPath: `${id}/${boomName}` } : {}),
   };
   await fs.writeFile(path.join(dir,'metadata.json'), JSON.stringify(metadata, null, 2));
   files.push('metadata.json');
@@ -124,10 +136,12 @@ const server = http.createServer(async (req, res) => {
         let meta = {}; try { meta = JSON.parse(await fs.readFile(path.join(dir,'metadata.json'),'utf8')); } catch {}
         const files = await fs.readdir(dir).catch(()=>[]);
         const frames = files.filter((f)=>/^frame-\d+\.jpg$/.test(f)).sort();
+        const boomFile = files.find((f)=>/^boomerang\.(webm|mp4)$/.test(f));
         out.push({
           id, createdAt: meta.createdAt || null, numPhotos: meta.numPhotos ?? frames.length,
           background: meta.background || null,
           strip: files.includes('strip.png') ? `/sessions/${id}/strip.png` : null,
+          boomerang: boomFile ? `/sessions/${id}/${boomFile}` : null,
           frames: frames.map((f)=>`/sessions/${id}/${f}`), meta,
         });
       }

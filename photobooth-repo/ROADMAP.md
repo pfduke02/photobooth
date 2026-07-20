@@ -78,30 +78,62 @@ delete incl. storage files, 🧹 orphan cleanup — via a service-role `admin`
 Edge Function gated by `x-admin-key`) · ✅ gallery date filters (from/to).
 7 headless suites green. AI-pack finding: the FaceLandmarker model can't be
 vendored from the build sandbox, but browsers can load it at runtime from
-Google's CDN — so face props are viable without bundling.
+Google's CDN — so face props are viable without bundling. Deploys became
+**git-connected** (Pages ← github.com/pfduke02/photobooth, build output
+`photobooth-repo`) — updating the live site is now just a push/upload to the
+repo. Local backup went autopilot: `sync.py --install-auto` installs a launchd
+agent (every 30 min) that mirrors the cloud to `~/Photobooth`, keeps a flat
+`strips/` summary folder, and copies strips into a local Google Drive folder
+when Drive for desktop is present.
+
+**V1.4 (shipped) — Phase 1 complete, 7/7:** ✅ **boomerang** — after the 4th
+shot the booth samples ~1.4s of live (AI-composited) frames, plays a ping-pong
+loop on the review screen, encodes it with `MediaRecorder`
+(mp4 preferred, webm fallback) concurrently while you review, saves it with
+the session (local file + cloud storage + `boomerangPath` in metadata), shows
+it on the result screen with its own save/share button, and plays it in the
+gallery detail view · ✅ **live theme previews** — the review screen grew a
+rail of four real mini-strips (your actual shots composited per theme); tap
+one to pick the strip theme, restoring theme choice to the guest flow without
+un-hiding the old chooser · ✅ **beefier flash** — radial white burst with a
+slower decay curve. Review auto-continue tightened 12s → 7s (Pete: "preview
+mode is a bit long"); QR caption now includes save instructions ("press &
+hold the photo → 'Save to Photos'"). 8 headless suites green
+(`test_boomerang.mjs` new: rail rendered + selection recorded in metadata,
+boomerang encoded, file on disk, `boomerangPath` present).
+
+**V2.0 (shipped) — Phase 2A, tier A of the AI pack:** ✅ **face props** —
+👑/🎩/🕶/🎲 as a second guest picker row (Pete's call, and "DEFINITELY
+CROWNS"). MediaPipe FaceLandmarker loaded at runtime from the CDN on first
+use, up to 4 faces, props bake into shots/retakes/boomerang; per-shot surprise
+rolls recorded in metadata; gallery Prop filter + badges. ✅ **style filters**
+— Pop Art + Cyanotype join the review rail as live-previewed strip themes.
+✅ result-screen rework (auto-save is the message; download demoted to a small
+ghost button; QR caption = full save instructions; review 7s→5s). ✅ live-site
+fix: versioned asset URLs + `404.html` end the immutable-cached-HTML-as-JS
+failure ("Couldn't load the segmentation model" on the live site). 9 headless
+suites green (`test_props.mjs` new, via `?fakeface=1` synthetic landmarks).
 
 ## Next steps (agreed order)
 
-1. **Phase 2A AI pack** — on-device face props via MediaPipe FaceLandmarker
-   (runtime model load) + style filters. NOTE: needs a UI decision from Pete —
-   guest UI is currently Background-only by his call, so where do props live?
+1. **Phase 2B** — a local Python img2img restyle (tier B: model serving,
+   ControlNet/img2img, latency budgeting) on one "hero" frame per strip.
 2. **Text search** over notes/tags in the gallery.
 3. **Background pack polish** (later version, per Pete) — refine/replace the
    generated backdrops: real-photo options, better studio/bokeh, seasonal sets.
-   Restore the shots (3/4), mirror, and strip-theme choosers when wanted —
-   hidden since V1.2, each a one-line `display:none` removal.
-4. **Git-connected auto-deploys** (Pages ← repo, empty build command), retiring
-   the zip-drop update flow.
-5. **Central Park backdrop** — blocked on receiving the proposal photo file.
-6. (~V4) custom domain; printing + hardware per HARDWARE.md.
+   Restore the shots (3/4) and mirror choosers when wanted — hidden since
+   V1.2, each a one-line `display:none` removal (theme choice is back via the
+   V1.4 review rail).
+4. **Central Park backdrop** — blocked on receiving the proposal photo file.
+5. **Printing** — Pete: not available today but "eventually will be needed."
+   Canon SELPHY dye-sub path per HARDWARE.md (two 2×6 strips per 4×6 sheet);
+   strips are already print-true 2×6" @300dpi, so this is hardware + a print
+   dialog/queue, no image-pipeline work.
+6. (~V4) custom domain; remaining hardware per HARDWARE.md.
 
-Next: a **public, shareable gallery URL + QR** — the last piece, which needs
-hosting the static folder (e.g. Cloudflare Pages / Netlify) so guests can reach
-it from their phones; remove the couple from the Central Park photo to add as a
-backdrop (needs the file); more booth polish (QR-to-phone, boomerang/GIF).
-
-Files: `photobooth.html` (app), `test.mjs` (headless test), `README.md` (how to
-run), plus `sample_strip.png` / `app_screenshot.png` from the test run.
+Files: `index.html` (app), `gallery.html`, `server.mjs`/`server.py` (local
+backend), `sync.py` (cloud→local mirror + auto-sync), `test*.mjs` (8 headless
+suites), `README.md` (how to run).
 
 ### V0 architecture, in one breath
 
@@ -110,12 +142,13 @@ frame to a canvas (`grabFrame`) → stack the frames + footer onto a 2× canvas
 and `toDataURL` a PNG (`composeStrip`) → persist to a guarded `localStorage`
 gallery. Trigger is a button + Space/Enter (arcade-button-ready).
 
-## Phase 1 — Polish the core (browser only)
+## Phase 1 — Polish the core (browser only) — STATUS: 7 / 7 ✅ COMPLETE
 
-Strip layouts/themes and a live preview of them; per-frame retake; a
-countdown/flash sound and a beefier flash; a **boomerang/GIF** mode via
-`MediaRecorder`; a **QR code** so a phone can grab the strip. *Learn:* canvas
-detail, `MediaRecorder`, small UX touches.
+✅ Strip themes (V0.6.1) · ✅ live theme preview (V1.4 review rail — real
+mini-strips of your shots, tap to choose) · ✅ per-frame retake (V1.3) ·
+✅ countdown/shutter sounds (V1.0) · ✅ beefier flash (V1.4) · ✅ boomerang
+via `MediaRecorder` (V1.4 — the last learning goal of the phase) ·
+✅ QR-to-phone (V1.1, exceeded: per-strip QR + share sheet).
 
 ## Phase 2 — AI effects (the "AI photobooth")
 

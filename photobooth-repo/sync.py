@@ -42,6 +42,9 @@ def sync_cloud():
         d = os.path.join(OUT, s["id"])
         os.makedirs(d, exist_ok=True)
         paths = ([s["strip_path"]] if s.get("strip_path") else []) + (s.get("frame_paths") or [])
+        boom_path = (s.get("meta") or {}).get("boomerangPath")
+        if boom_path:
+            paths = paths + [boom_path]
         pulled = []
         for p in paths:
             fp = os.path.join(d, os.path.basename(p))

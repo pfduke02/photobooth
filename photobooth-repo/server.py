@@ -38,6 +38,15 @@ def save_session(payload):
         name = f"frame-{i+1}.jpg"
         with open(os.path.join(d, name), "wb") as f: f.write(b)
         files.append(name)
+    boom_name = None
+    boom = payload.get("boomerang")
+    if boom:
+        bm = re.match(r"^data:(video/(?:webm|mp4));base64,", boom)
+        if bm:
+            boom_name = "boomerang." + bm.group(1).split("/")[1]
+            with open(os.path.join(d, boom_name), "wb") as f:
+                f.write(data_url_to_bytes(boom))
+            files.append(boom_name)
     meta = {
         "id": sid,
         "createdAt": payload.get("createdAt") or datetime.datetime.utcnow().isoformat() + "Z",
@@ -46,6 +55,7 @@ def save_session(payload):
         "strip": "strip.png" if strip else None,
         "frames": [f for f in files if f.startswith("frame-")],
         **(payload.get("meta") or {}),
+        **({"boomerangPath": f"{sid}/{boom_name}"} if boom_name else {}),
     }
     with open(os.path.join(d, "metadata.json"), "w") as f: json.dump(meta, f, indent=2)
     files.append("metadata.json")
@@ -83,12 +93,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         except Exception: meta = {}
                     files = [f for f in os.listdir(d) if f != "metadata.json"]
                     frames = sorted(f for f in files if re.match(r"^frame-\d+\.jpg$", f))
+                    boom_f = next((f for f in files if re.match(r"^boomerang\.(webm|mp4)$", f)), None)
                     out.append({
                         "id": sid,
                         "createdAt": meta.get("createdAt"),
                         "numPhotos": meta.get("numPhotos", len(frames)),
                         "background": meta.get("background"),
                         "strip": f"/sessions/{sid}/strip.png" if "strip.png" in files else None,
+                        "boomerang": f"/sessions/{sid}/{boom_f}" if boom_f else None,
                         "frames": [f"/sessions/{sid}/{f}" for f in frames],
                         "meta": meta,
                     })
@@ -117,6 +129,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 if __name__ == "__main__":
     os.makedirs(SESSIONS, exist_ok=True)
     mimetypes.add_type("text/javascript", ".mjs")
+    mimetypes.add_type("video/webm", ".webm")
     print(f"\n\U0001F4F8  Photobooth · local collection server (Python)")
     print(f"    open  ->  http://localhost:{PORT}/")
     print(f"    saves ->  {SESSIONS}/<id>/\n")

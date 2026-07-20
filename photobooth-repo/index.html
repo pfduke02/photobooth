@@ -40,9 +40,9 @@
   #shotDots.hidden { display:none; }
   #aiBadge { position:absolute; top:12px; left:12px; font-size:11px; letter-spacing:.06em; background:rgba(0,0,0,.5); color:var(--accent); padding:5px 9px; border-radius:999px; display:none; backdrop-filter:blur(4px); }
   #aiBadge.show { display:block; }
-  #flash { position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; }
-  #flash.fire { animation:flash .35s ease-out; }
-  @keyframes flash { 0%{opacity:.9;} 100%{opacity:0;} }
+  #flash { position:absolute; inset:0; background:radial-gradient(circle at 50% 42%, #ffffff 0%, #fdf6ea 70%, #f4e8d0 100%); opacity:0; pointer-events:none; z-index:4; }
+  #flash.fire { animation:flash .5s cubic-bezier(.15,.75,.3,1); }
+  @keyframes flash { 0%{opacity:1;} 35%{opacity:.95;} 100%{opacity:0;} }
   #camError { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; padding:24px; background:#11131a; }
   #camError.show { display:flex; }
   #camError .big { font-size:40px; }
@@ -56,6 +56,15 @@
   .rvThumb:hover { transform:translateY(-2px); border-color:var(--accent); }
   .rvThumb img { width:100%; display:block; }
   .rvThumb .redo { position:absolute; inset:auto 0 0 0; background:rgba(0,0,0,.66); color:#fff; text-align:center; font-size:12px; font-weight:600; padding:4px 0; }
+  #rvRail { display:flex; gap:10px; align-items:flex-end; justify-content:center; flex-wrap:wrap; }
+  #rvRail .rvLbl { width:100%; text-align:center; color:#cfd3e0; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+  .rvTheme { cursor:pointer; text-align:center; }
+  .rvTheme img { display:block; width:52px; border-radius:6px; border:2px solid #3a3f52; transition:border-color .15s, transform .08s; }
+  .rvTheme.sel img { border-color:var(--accent); box-shadow:0 0 0 2px rgba(231,198,155,.3); }
+  .rvTheme:hover img { transform:translateY(-2px); }
+  .rvTheme .nm { color:var(--muted); font-size:10px; font-weight:600; margin-top:3px; }
+  .rvTheme.sel .nm { color:var(--accent); }
+  #rvBoom { width:84px; border-radius:10px; border:2px solid #3a3f52; display:none; }
 
   #controls { margin-top:14px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
   .btn { appearance:none; border:0; cursor:pointer; font-family:var(--font); font-size:15px; font-weight:600; padding:12px 18px; border-radius:12px; background:#232634; color:var(--ink); transition:transform .06s ease, filter .15s ease, background .15s ease; }
@@ -108,7 +117,7 @@
 <body>
   <header>
     <h1 id="brandTitle">Photobooth</h1>
-    <p id="brandSub">V1.3 · booth · cloud + local collection · gallery</p>
+    <p id="brandSub">V2.0 · booth · AI props · cloud + local collection · gallery</p>
   </header>
 
   <main>
@@ -130,6 +139,8 @@
         <div id="review">
           <div class="rvTitle">Happy with these? Tap a photo to redo it</div>
           <div id="rvThumbs"></div>
+          <div id="rvRail"><div class="rvLbl">Strip style — live preview</div></div>
+          <canvas id="rvBoom" width="640" height="480"></canvas>
           <button class="btn primary" id="rvOk">✓ Make my strip</button>
         </div>
       </div>
@@ -138,8 +149,17 @@
         <button class="btn primary" id="startBtn" disabled>Start</button>
         <button class="btn ghost" id="switchCam" style="display:none">⇆ Camera</button>
         <button class="btn ghost" id="bgToggle">✨ Background: Off</button>
-        <!-- Simplified guest UI: Background is the only choice. Shots fixed at 4,
-             mirror on, theme via CONFIG — remove display:none to bring these back. -->
+        <!-- Phase 2A: face props — the guest's second (and last) choice. -->
+        <div class="seg" id="propSeg" title="Face props — drawn live on every face">
+          <button data-prop="none" class="active">🪄 off</button>
+          <button data-prop="crown" title="Crown">👑</button>
+          <button data-prop="tophat" title="Top hat">🎩</button>
+          <button data-prop="glasses" title="Sunglasses">🕶</button>
+          <button data-prop="surprise" title="Surprise — a random prop every shot">🎲</button>
+        </div>
+        <!-- Simplified guest UI: Background + Props are the only choices. Shots
+             fixed at 4, mirror on, theme via the review rail — remove
+             display:none to bring these back. -->
         <div class="seg" id="countSeg" title="Photos per strip" style="display:none">
           <button data-n="3">3 shots</button>
           <button data-n="4" class="active">4 shots</button>
@@ -151,6 +171,8 @@
             <option value="noir">Noir B&amp;W</option>
             <option value="warm">Warm Film</option>
             <option value="wedding">Wedding</option>
+            <option value="pop">Pop Art</option>
+            <option value="cyan">Cyanotype</option>
           </select>
         </label>
         <button class="btn ghost" id="galleryLink" title="Browse saved sessions">🖼 Gallery</button>
@@ -185,18 +207,26 @@
         <p id="uploadStatus" class="ustat"></p>
         <div id="stripQr" style="display:none; text-align:center; background:#fff; border-radius:12px; padding:10px; margin:2px 0 6px;">
           <img id="stripQrImg" alt="QR code for this strip" style="width:132px; height:132px; image-rendering:pixelated; display:block; margin:0 auto;" />
-          <div style="font:600 11px var(--font); color:#333; margin-top:6px;">📱 Scan to open &amp; save on a phone</div>
+          <div style="font:700 12px var(--font); color:#222; margin-top:6px;">📱 Scan — your strip opens on your phone</div>
+          <div style="font:500 10.5px var(--font); color:#666; margin-top:3px;">then press &amp; hold the photo and tap “Save to Photos” / “Add to Photos”</div>
         </div>
-        <button class="btn primary" id="downloadBtn">⬇ Save strip</button>
-        <button class="btn" id="againBtn">↺ Take another</button>
+        <video id="boomVid" loop muted playsinline autoplay style="display:none; width:100%; max-width:240px; border-radius:10px; border:1px solid #303445;"></video>
+        <button class="btn primary" id="againBtn">↺ Take another</button>
+        <button class="btn" id="boomSave" style="display:none">🌀 Save boomerang</button>
+        <!-- Strip already saves automatically (cloud + gallery) — this is just a
+             local-file copy, so it's deliberately small/unhighlighted. -->
+        <button class="btn ghost" id="downloadBtn" style="font-size:13px; padding:9px 14px;">⬇ Download to this device</button>
         <button class="btn ghost" id="retryUpload" style="display:none">↻ Retry upload</button>
         <button class="btn ghost" id="closeResult">Close</button>
       </div>
     </div>
   </div>
 
-  <script src="assets/qrcode.js"></script>
-  <script src="assets/mediapipe/selfie_segmentation.js"></script>
+  <!-- ?v= busts any stale immutable-cached copy (early deploys served missing
+       asset paths as index.html with 200 + our immutable header — Chrome then
+       kept executing cached HTML as JS until the URL changed). Bump with appVersion. -->
+  <script src="assets/qrcode.js?v=2.0"></script>
+  <script src="assets/mediapipe/selfie_segmentation.js?v=2.0"></script>
 <script>
 /* ============================================================================
    PHOTOBOOTH · V0.5 — local digital photobooth. Two concerns, kept separate:
@@ -238,8 +268,22 @@ const CONFIG = {
   // After the last shot: review thumbnails, tap one to redo it. Auto-continues
   // after reviewSeconds so a guest who walks away still gets their strip
   // (and exactly ONE upload per session — retakes happen BEFORE compose/upload).
-  retake:{ enabled:true, reviewSeconds:12 },
-  appVersion:"1.3",
+  retake:{ enabled:true, reviewSeconds:5 },
+  // 🌀 Boomerang: after the last shot, capture a short "move!" clip and encode
+  // a looping ping-pong video (MediaRecorder). Saved/shared alongside the strip
+  // and uploaded with the session. Encoding happens DURING the review wait.
+  boomerang:{ enabled:true, seconds:1.4, fps:20, playbackFps:24 },
+  // 🪄 Phase 2A — face props (crown/top hat/sunglasses) via MediaPipe
+  // FaceLandmarker. The model can't be vendored (build-sandbox egress), so it
+  // loads AT RUNTIME from Google's CDN the first time a guest picks a prop —
+  // nothing loads on page start, and a failed load just disables props
+  // (capture NEVER depends on it). ?fakeface=1 = synthetic landmarks (tests).
+  props:{
+    enabled:true, maxFaces:4,
+    cdn:"https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14",
+    model:"https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+  },
+  appVersion:"2.0",
   strip:{ bg:"#ffffff", frame:"#111111", accent:"#c98a6b", text:"#111111", sub:"#8a8a8a" },
   galleryMax:24,
 };
@@ -268,9 +312,16 @@ const STRIP_THEMES = [
     footer:{ serif:false, upper:true } },
   { id:"wedding", name:"Wedding",   bg:"#faf6f0", frame:"#c2a15a", accent:"#c2a15a", text:"#4a4038", sub:"#8a7f72", filter:"none",
     footer:{ serif:true, upper:false, l1:"Lisa & Pete", l2:"November 7th · 2026" } },
+  /* Phase 2A style filters — pure CSS canvas filters, so they preview live in
+     the review rail and cost nothing at compose time. */
+  { id:"pop",  name:"Pop Art",   bg:"#ffe14d", frame:"#e0362c", accent:"#1c6fd6", text:"#1a1a1a", sub:"#8a5a00", filter:"saturate(2.1) contrast(1.32) brightness(1.04)",
+    footer:{ serif:false, upper:true } },
+  { id:"cyan", name:"Cyanotype", bg:"#eef4fa", frame:"#1d4e89", accent:"#1d4e89", text:"#173a63", sub:"#5b7ba3", filter:"grayscale(1) sepia(.85) hue-rotate(160deg) saturate(2.6) brightness(.98)",
+    footer:{ serif:false, upper:true } },
 ];
 
 const FAST = new URLSearchParams(location.search).has("fast");
+const FAKEFACE = new URLSearchParams(location.search).has("fakeface");   // synthetic landmarks for headless tests
 const TICK_MS = FAST ? 120 : 1000;
 const GAP_MS  = FAST ? 120 : CONFIG.betweenShotsMs;
 const REVIEW_MS = FAST ? 1200 : CONFIG.retake.reviewSeconds*1000;
@@ -305,13 +356,16 @@ const state = {
   numPhotos:CONFIG.numPhotos, mirror:CONFIG.mirror, busy:false, lastStripURL:null,
   aiOn:false, currentBg:BGS.find(b=>b.id===CONFIG.ai.defaultBg)||BGS[0], customImg:null,
   stripTheme:"classic",
+  prop:"none", rolledProp:null, propShots:[], faces:[],
 };
 let seg=null, segReady=false, rafId=null;
+let faceLm=null, faceLmReady=false, faceLmLoading=false;
 let lastSession=null, collectionAvailable=false;
 
 window.__PB = { ready:false, aiReady:false, done:false, count:0, lastStrip:null, error:null, upload:null,
-                review:{open:false}, retake:null, confirmReview:null,
-                enableAI:()=>enableAI(), setBg:(id)=>selectBg(id), setTheme:(id)=>setStripTheme(id), setShots:(n)=>setShots(n) };
+                review:{open:false}, retake:null, confirmReview:null, propsReady:false, propDraws:0,
+                enableAI:()=>enableAI(), setBg:(id)=>selectBg(id), setTheme:(id)=>setStripTheme(id), setShots:(n)=>setShots(n),
+                setProp:(id)=>selectProp(id) };
 
 /* ---------- 3) camera ----------------------------------------------------- */
 async function startCamera(deviceId=null){
@@ -347,6 +401,7 @@ function showCamError(err){
 function startLoop(){ if(rafId) return; const step=()=>{ renderOnce().finally(()=>{ rafId=requestAnimationFrame(step); }); }; rafId=requestAnimationFrame(step); }
 async function renderOnce(){
   if(!videoReady()) return;
+  if(propsActive()) updateFaces();
   if(state.aiOn && seg && segReady){ try { await seg.send({ image: els.video }); } catch(e){ window.__PB.error=String(e&&e.message||e); drawRaw(); } }
   else drawRaw();
 }
@@ -354,6 +409,7 @@ function drawRaw(){
   const w=els.proc.width, h=els.proc.height, c=procCtx;
   c.save(); if(state.mirror){ c.translate(w,0); c.scale(-1,1); }
   c.globalCompositeOperation="source-over"; c.drawImage(els.video,0,0,w,h); c.restore();
+  drawProps(c);
 }
 function onSegResults(results){
   const w=els.proc.width, h=els.proc.height, c=procCtx;
@@ -365,6 +421,7 @@ function onSegResults(results){
   c.globalCompositeOperation="source-in"; c.drawImage(results.image,0,0,w,h);
   c.globalCompositeOperation="destination-over"; drawBackground(c,results.image,w,h);
   c.globalCompositeOperation="source-over"; c.restore();
+  drawProps(c);
 }
 function drawBackground(c,image,w,h){
   const bg=state.currentBg;
@@ -376,7 +433,7 @@ function drawBackground(c,image,w,h){
 function coverDraw(c,img,w,h){ const ir=img.width/img.height, r=w/h; let dw,dh,dx,dy; if(ir>r){ dh=h; dw=h*ir; dx=(w-dw)/2; dy=0; } else { dw=w; dh=w/ir; dx=0; dy=(h-dh)/2; } c.drawImage(img,dx,dy,dw,dh); }
 async function initSegmenter(){
   if(seg) return true; if(typeof SelfieSegmentation==="undefined") return false;
-  try { seg=new SelfieSegmentation({ locateFile:(f)=>`assets/mediapipe/${f}` }); seg.setOptions({ modelSelection:CONFIG.ai.modelSelection, selfieMode:false }); seg.onResults(onSegResults); if(videoReady()) await seg.send({ image: els.video }); segReady=true; window.__PB.aiReady=true; return true; }
+  try { seg=new SelfieSegmentation({ locateFile:(f)=>`assets/mediapipe/${f}?v=${CONFIG.appVersion}` }); seg.setOptions({ modelSelection:CONFIG.ai.modelSelection, selfieMode:false }); seg.onResults(onSegResults); if(videoReady()) await seg.send({ image: els.video }); segReady=true; window.__PB.aiReady=true; return true; }
   catch(e){ seg=null; segReady=false; return false; }
 }
 async function enableAI(){
@@ -388,6 +445,110 @@ async function enableAI(){
   els.bgTray.classList.remove("hidden"); els.aiBadge.classList.add("show"); renderBgChips(); return true;
 }
 function disableAI(){ state.aiOn=false; els.bgToggle.textContent="✨ Background: Off"; els.bgToggle.classList.remove("on"); els.bgTray.classList.add("hidden"); els.aiBadge.classList.remove("show"); }
+
+/* ---------- 4b) face props (Phase 2A) ------------------------------------- */
+/* Landmarks come from MediaPipe FaceLandmarker (loaded lazily from the CDN on
+   first use) or, with ?fakeface=1, from a synthetic provider so headless tests
+   don't need a real face. Props draw on #proc AFTER compositing, so they bake
+   into shots, retakes, and the boomerang for free — up to 4 faces at once. */
+const PROP_IDS=["crown","tophat","glasses"];
+function propsActive(){ return CONFIG.props.enabled && state.prop!=="none"; }
+function activeProp(){ return state.prop==="surprise" ? (state.rolledProp||"crown") : state.prop; }
+function rollProp(){ state.rolledProp=PROP_IDS[Math.floor(Math.random()*PROP_IDS.length)]; }
+
+async function initFaceProps(){
+  if(faceLmReady) return true;
+  if(FAKEFACE){ faceLmReady=true; window.__PB.propsReady=true; return true; }
+  if(faceLmLoading) return false;
+  faceLmLoading=true;
+  try{
+    const vision=await import(CONFIG.props.cdn+"/vision_bundle.mjs");
+    const fileset=await vision.FilesetResolver.forVisionTasks(CONFIG.props.cdn+"/wasm");
+    faceLm=await vision.FaceLandmarker.createFromOptions(fileset,{
+      baseOptions:{ modelAssetPath:CONFIG.props.model },
+      runningMode:"VIDEO", numFaces:CONFIG.props.maxFaces });
+    faceLmReady=true; window.__PB.propsReady=true; return true;
+  }catch(e){ window.__PB.error="props: "+String(e&&e.message||e); return false; }
+  finally{ faceLmLoading=false; }
+}
+
+/* Normalized video coords → #proc pixels, honoring the mirror. Geometry per
+   face: both eye points (screen-left/right), midpoint, inter-eye distance
+   (the scale unit), roll angle, forehead. */
+function faceGeom(p,w,h){
+  const M=(x)=> state.mirror ? (1-x)*w : x*w;
+  let a={x:M(p.exl), y:p.eyl*h}, b={x:M(p.exr), y:p.eyr*h};
+  if(a.x>b.x){ const t=a; a=b; b=t; }
+  const mid={x:(a.x+b.x)/2, y:(a.y+b.y)/2};
+  const ipd=Math.hypot(b.x-a.x,b.y-a.y);
+  const ang=Math.atan2(b.y-a.y,b.x-a.x);
+  return { eL:a, eR:b, mid, ipd, ang, forehead:{x:M(p.fx), y:p.fy*h} };
+}
+function updateFaces(){
+  const w=els.proc.width, h=els.proc.height;
+  if(FAKEFACE){
+    const t=performance.now()/1000, bob=Math.sin(t*2)*0.01;
+    state.faces=[ faceGeom({ exl:.40, eyl:.45+bob, exr:.60, eyr:.45+bob, fx:.5, fy:.30+bob }, w, h) ];
+    return;
+  }
+  if(!faceLmReady || !faceLm) return;
+  try{
+    const res=faceLm.detectForVideo(els.video, performance.now());
+    state.faces=(res.faceLandmarks||[]).map(lm=>faceGeom({
+      exl:lm[33].x, eyl:lm[33].y, exr:lm[263].x, eyr:lm[263].y,   // outer eye corners
+      fx:lm[10].x,  fy:lm[10].y }, w, h));                        // top of forehead
+  }catch(e){ /* keep last faces — a dropped frame never breaks the loop */ }
+}
+
+function drawProps(c){
+  if(!propsActive() || !state.faces.length) return;
+  const id=activeProp();
+  for(const f of state.faces){ if(f.ipd>=8) { drawProp(c,id,f); window.__PB.propDraws++; } }
+}
+function rr(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+function drawProp(c,id,f){
+  c.save();
+  if(id==="glasses"){
+    // Vector-drawn so the lenses align exactly with the detected eyes.
+    c.translate(f.mid.x,f.mid.y); c.rotate(f.ang);
+    const lw=f.ipd*0.66, lh=f.ipd*0.52, cx=f.ipd*0.5;
+    c.fillStyle="rgba(12,12,16,.93)"; c.strokeStyle="rgba(5,5,8,.95)"; c.lineWidth=Math.max(2,f.ipd*0.07); c.lineCap="round";
+    rr(c,-cx-lw/2,-lh/2,lw,lh,lh*0.38); c.fill(); c.stroke();
+    rr(c, cx-lw/2,-lh/2,lw,lh,lh*0.38); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(-cx+lw/2,-lh*0.16); c.quadraticCurveTo(0,-lh*0.34,cx-lw/2,-lh*0.16); c.stroke();     // bridge
+    c.beginPath(); c.moveTo(-cx-lw/2,-lh*0.10); c.lineTo(-cx-lw/2-f.ipd*0.34,-lh*0.30); c.stroke();              // temples
+    c.beginPath(); c.moveTo( cx+lw/2,-lh*0.10); c.lineTo( cx+lw/2+f.ipd*0.34,-lh*0.30); c.stroke();
+    c.fillStyle="rgba(255,255,255,.20)";                                                                          // sheen
+    rr(c,-cx-lw*0.36,-lh*0.34,lw*0.30,lh*0.20,lh*0.10); c.fill();
+    rr(c, cx-lw*0.36,-lh*0.34,lw*0.30,lh*0.20,lh*0.10); c.fill();
+  } else {
+    // Emoji props — zero assets; sized by inter-eye distance, rotated with the head.
+    const glyph = id==="tophat" ? "🎩" : "👑";
+    const size  = f.ipd * (id==="tophat" ? 1.9 : 1.6);            // ≈ head width (ipd = outer eye corners)
+    const lift  = f.ipd * (id==="tophat" ? 0.70 : 0.45);          // above the forehead point
+    c.translate(f.forehead.x,f.forehead.y); c.rotate(f.ang);
+    c.font=`${Math.round(size)}px ${fontStack()}`; c.textAlign="center"; c.textBaseline="middle";
+    c.fillText(glyph,0,-lift);
+  }
+  c.restore();
+}
+
+async function selectProp(id){
+  if(!["none","surprise",...PROP_IDS].includes(id)) return;
+  state.prop=id; renderPropSeg();
+  if(id!=="none" && !faceLmReady){
+    if(!FAKEFACE) showToast("🪄 Loading the face model… (first time only)");
+    setPropSegEnabled(false);
+    const ok=await initFaceProps();
+    setPropSegEnabled(true);
+    if(!ok){ state.prop="none"; renderPropSeg();
+      showToast("Props couldn't load (model download failed — network?). Everything else still works."); return; }
+  }
+  if(id==="surprise") rollProp();
+  if(id==="none") state.faces=[];
+}
+function renderPropSeg(){ document.querySelectorAll("#propSeg button").forEach(b=>b.classList.toggle("active", b.dataset.prop===state.prop)); }
+function setPropSegEnabled(on){ document.querySelectorAll("#propSeg button").forEach(b=>b.disabled=!on); }
 
 let toastT=null;
 function showToast(msg){
@@ -448,20 +609,30 @@ function sfx(kind){
 async function runSession(){
   if(state.busy || !state.stream) return;
   state.busy=true; setControlsEnabled(false); window.__PB.done=false; window.__PB.count=0;
+  window.__PB.upload=null;   // stale status from the previous session must not leak into this one
   hideStripQr();
-  const shots=[]; buildShotDots(state.numPhotos);
+  const shots=[]; buildShotDots(state.numPhotos); state.propShots=[];
   for(let i=0;i<state.numPhotos;i++){
+    if(state.prop==="surprise") rollProp();            // 🎲 new prop each shot — guests see it live
     await countdown(CONFIG.countdownSeconds); await flashAndGrab(shots);
+    state.propShots.push(propsActive()?activeProp():"none");
     markShotDone(i); window.__PB.count=shots.length;
     if(i<state.numPhotos-1) await sleep(GAP_MS);
   }
   els.shotDots.classList.add("hidden");
-  if(CONFIG.retake.enabled) await openReview(shots);   // retakes happen BEFORE compose/upload
+  window.__PB.boomerang=null;
+  const boomFrames=await captureBoomerang();            // quick "🌀 move!" clip
+  const boomPromise=encodeBoomerang(boomFrames);        // encodes DURING the review wait
+  if(CONFIG.retake.enabled) await openReview(shots, boomFrames);
   const url=composeStrip(shots);
-  state.lastStripURL=url; state.lastStripTheme=state.stripTheme; window.__PB.lastStrip=url; window.__PB.done=true;
+  state.lastStripURL=url; state.lastStripTheme=state.stripTheme; window.__PB.lastStrip=url;
+  const boom=await boomPromise;                         // usually already finished
+  state.lastBoomerang=boom||null;
+  window.__PB.done=true;
   if(url){
-    saveToGallery(url); showResult(url);
-    uploadSession(buildSession(shots, url));   // COLLECTION: background upload — never blocks capture
+    saveToGallery(url); showResult(url); setBoomResultUI(boom);
+    const boomDataUrl = boom ? await blobToDataURL(boom.blob) : null;
+    uploadSession(buildSession(shots, url, boomDataUrl));   // COLLECTION: background upload — never blocks capture
   }
   state.busy=false; setControlsEnabled(true);
 }
@@ -472,13 +643,62 @@ async function countdown(seconds){
 async function flashAndGrab(shots){ els.flash.classList.remove("fire"); void els.flash.offsetWidth; els.flash.classList.add("fire"); sfx("shutter"); shots.push(grabFrame()); await sleep(FAST?40:220); }
 async function flashAndGrabInto(shots,i){ els.flash.classList.remove("fire"); void els.flash.offsetWidth; els.flash.classList.add("fire"); sfx("shutter"); shots[i]=grabFrame(); await sleep(FAST?40:220); }
 
+/* ---------- 5a-pre) boomerang -------------------------------------------- */
+const blobToDataURL=(blob)=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(blob); });
+
+/* Sample a short clip of frames from the live (composited) canvas. */
+async function captureBoomerang(){
+  if(!CONFIG.boomerang.enabled) return null;
+  const secs=FAST?0.4:CONFIG.boomerang.seconds, fps=FAST?10:CONFIG.boomerang.fps;
+  els.prompt.textContent="🌀 BOOMERANG — move!"; els.prompt.classList.add("show"); sfx("go");
+  const frames=[]; const n=Math.max(4, Math.round(secs*fps));
+  for(let i=0;i<n;i++){
+    const src=els.proc;
+    let sw=src.width, sh=Math.round(sw*3/4); if(sh>src.height){ sh=src.height; sw=Math.round(sh*4/3); }
+    const sx=Math.round((src.width-sw)/2), sy=Math.round((src.height-sh)/2);
+    const c=document.createElement("canvas"); c.width=640; c.height=480;
+    c.getContext("2d").drawImage(src, sx,sy,sw,sh, 0,0,640,480);
+    frames.push(c);
+    await sleep(1000/fps);
+  }
+  els.prompt.classList.remove("show"); els.prompt.textContent="Smile! 📸";
+  return frames;
+}
+
+/* Encode forward+reverse (ping-pong) frames to a real video via MediaRecorder.
+   Runs in real time, so it's kicked off in parallel with the review screen. */
+async function encodeBoomerang(frames){
+  try{
+    if(!frames || frames.length<3 || typeof MediaRecorder==="undefined") return null;
+    const seq=[...frames, ...frames.slice(1,-1).reverse()];
+    const c=document.createElement("canvas"); c.width=640; c.height=480;
+    const x=c.getContext("2d"); x.drawImage(frames[0],0,0);
+    const fps=FAST?12:CONFIG.boomerang.playbackFps;
+    const stream=c.captureStream(fps);
+    const mime=["video/mp4","video/webm;codecs=vp9","video/webm"].find(m=>MediaRecorder.isTypeSupported(m));
+    if(!mime) return null;
+    const rec=new MediaRecorder(stream,{ mimeType:mime, videoBitsPerSecond:2_500_000 });
+    const chunks=[]; rec.ondataavailable=(e)=>{ if(e.data && e.data.size) chunks.push(e.data); };
+    const stopped=new Promise(r=>rec.onstop=r);
+    rec.start();
+    const cycles=FAST?1:2;
+    for(let k=0;k<cycles;k++){ for(const f of seq){ x.drawImage(f,0,0); await sleep(1000/fps); } }
+    rec.stop(); await stopped;
+    if(!chunks.length) return null;
+    const type=mime.split(";")[0];
+    const blob=new Blob(chunks,{type});
+    window.__PB.boomerang={ size:blob.size, ext:type.includes("mp4")?"mp4":"webm" };
+    return { blob, ext:type.includes("mp4")?"mp4":"webm", type };
+  }catch(e){ return null; }   // boomerang is a bonus — never break the session
+}
+
 /* ---------- 5a) retake review -------------------------------------------- */
 /* Shows the captured frames; tapping one re-runs countdown+capture into that
    slot. Auto-continues after REVIEW_MS so an abandoned booth still finishes. */
-function openReview(shots){
+function openReview(shots, boomFrames){
   return new Promise((resolve)=>{
     const rv=els.review, tray=els.rvThumbs, ok=els.rvOk;
-    let deadline=null, label=null, secsLeft=Math.round(REVIEW_MS/1000), retaking=false, done=false;
+    let deadline=null, label=null, secsLeft=Math.round(REVIEW_MS/1000), retaking=false, done=false, boomRaf=null;
     function renderThumbs(){
       tray.innerHTML="";
       shots.forEach((c,i)=>{
@@ -488,6 +708,30 @@ function openReview(shots){
         d.addEventListener("click",()=>doRetake(i));
         tray.appendChild(d);
       });
+    }
+    /* Live theme preview: mini strips rendered from the guest's REAL shots. */
+    function renderRail(){
+      const rail=document.querySelector("#rvRail");
+      rail.innerHTML='<div class="rvLbl">Strip style — live preview</div>';
+      STRIP_THEMES.forEach(t=>{
+        const d=document.createElement("div");
+        d.className="rvTheme"+(state.stripTheme===t.id?" sel":"");
+        const im=new Image(); im.src=composeStrip(shots, t.id, 0.09);   // ~54×162 mini strip
+        d.appendChild(im);
+        const nm=document.createElement("div"); nm.className="nm"; nm.textContent=t.name;
+        d.appendChild(nm);
+        d.addEventListener("click",()=>{ setStripTheme(t.id); renderRail(); });
+        rail.appendChild(d);
+      });
+    }
+    /* Looping ping-pong preview of the boomerang frames. */
+    function startBoomPreview(){
+      const bc=document.querySelector("#rvBoom");
+      if(!boomFrames || boomFrames.length<3){ bc.style.display="none"; return; }
+      bc.style.display="block"; const bx=bc.getContext("2d");
+      const seq=[...boomFrames, ...boomFrames.slice(1,-1).reverse()];
+      let i=0, last=0; const step=(ts)=>{ if(done) return; if(ts-last>1000/18){ bx.drawImage(seq[i%seq.length],0,0); i++; last=ts; } boomRaf=requestAnimationFrame(step); };
+      boomRaf=requestAnimationFrame(step);
     }
     function arm(){
       clearTimeout(deadline); clearInterval(label);
@@ -500,15 +744,18 @@ function openReview(shots){
       if(retaking||done) return; retaking=true;
       clearTimeout(deadline); clearInterval(label);
       rv.classList.remove("show"); window.__PB.review.open=false;
+      if(state.prop==="surprise") rollProp();
       await countdown(CONFIG.countdownSeconds);
       await flashAndGrabInto(shots,i);
-      renderThumbs();
+      state.propShots[i]=propsActive()?activeProp():"none";
+      renderThumbs(); renderRail();
       rv.classList.add("show"); window.__PB.review.open=true;
       retaking=false; arm();
     }
     function finish(){
       if(done||retaking) return; done=true;
       clearTimeout(deadline); clearInterval(label);
+      if(boomRaf) cancelAnimationFrame(boomRaf);
       rv.classList.remove("show"); window.__PB.review.open=false;
       window.__PB.retake=null; window.__PB.confirmReview=null;
       resolve();
@@ -516,7 +763,8 @@ function openReview(shots){
     ok.onclick=finish;
     window.__PB.retake=(i)=>doRetake(i);
     window.__PB.confirmReview=()=>finish();
-    renderThumbs(); rv.classList.add("show"); window.__PB.review.open=true; arm();
+    renderThumbs(); renderRail(); startBoomPreview();
+    rv.classList.add("show"); window.__PB.review.open=true; arm();
   });
 }
 function grabFrame(){
@@ -530,13 +778,15 @@ function grabFrame(){
 }
 
 /* ---------- 5b) local collection (the "upload contract") ------------------ */
-function buildSession(shots, stripUrl){
+function buildSession(shots, stripUrl, boomDataUrl){
   let frames=[];
   try { frames = shots.map(cv=>cv.toDataURL("image/jpeg", CONFIG.collection.jpegQuality)); } catch(e){ frames=[]; }
   return {
     createdAt:new Date().toISOString(), numPhotos:shots.length, strip:stripUrl, frames,
+    boomerang: boomDataUrl||undefined,
     meta:{ version:CONFIG.appVersion, mirror:state.mirror, aiEnabled:state.aiOn, stripTheme:state.stripTheme,
            background: state.aiOn ? state.currentBg.id : "none",
+           prop: state.prop, propShots: state.propShots.slice(),
            favorite:false, tags:[], note:"",          // editable later (admin); shape exists from day one
            frameSize: shots[0] ? [shots[0].width, shots[0].height] : null,
            client:{ userAgent:navigator.userAgent, viewport:[window.innerWidth,window.innerHeight], dpr:window.devicePixelRatio||1 } },
@@ -634,9 +884,9 @@ function setCollState(s){
    exported at CONFIG.exportScale (2× → 1200×3600). 4-shot = four 4:3 cells;
    3-shot = three SQUARE cells (same canvas, no awkward tall footer). Cells are
    center-cropped from the captured frames. Footer is 120px in both layouts. */
-function composeStrip(shots){
-  const T=STRIP_THEMES.find(t=>t.id===state.stripTheme)||STRIP_THEMES[0];
-  const S=CONFIG.exportScale, n=shots.length;
+function composeStrip(shots, themeId, scale){
+  const T=STRIP_THEMES.find(t=>t.id===(themeId||state.stripTheme))||STRIP_THEMES[0];
+  const S=scale||CONFIG.exportScale, n=shots.length;
   const stripW=600, stripH=1800, SIDE=30, TOP=24;
   const frameW=stripW-SIDE*2;                                   // 540
   const frameH = n===3 ? frameW : Math.round(frameW*3/4);        // 540 sq | 405 (4:3)
@@ -696,8 +946,25 @@ function downloadURL(url,filename){ const a=document.createElement("a"); a.href=
 /* ---------- 8) UI helpers + events ---------------------------------------- */
 function buildShotDots(n){ els.shotDots.innerHTML=""; for(let i=0;i<n;i++){ const d=document.createElement("div"); d.className="dot"; els.shotDots.appendChild(d); } els.shotDots.classList.remove("hidden"); }
 function markShotDone(i){ const d=els.shotDots.children[i]; if(d) d.classList.add("done"); }
-function setControlsEnabled(on){ els.startBtn.disabled=!on||!state.stream; els.switchCam.disabled=!on; els.mirrorBtn.disabled=!on; els.bgToggle.disabled=!on; els.countSeg.querySelectorAll("button").forEach(b=>b.disabled=!on); }
+function setControlsEnabled(on){ els.startBtn.disabled=!on||!state.stream; els.switchCam.disabled=!on; els.mirrorBtn.disabled=!on; els.bgToggle.disabled=!on; els.countSeg.querySelectorAll("button").forEach(b=>b.disabled=!on); setPropSegEnabled(on); }
 function showResult(url){ els.stripPreview.src=url; els.result.classList.add("show"); }
+function setBoomResultUI(boom){
+  const v=document.querySelector("#boomVid"), b=document.querySelector("#boomSave");
+  if(boom && boom.blob){ v.src=URL.createObjectURL(boom.blob); v.style.display=""; b.style.display=""; }
+  else { v.removeAttribute("src"); v.style.display="none"; b.style.display="none"; }
+}
+async function saveBoomerang(){
+  const boom=state.lastBoomerang; if(!boom) return;
+  const name=`photobooth_boomerang_${Date.now()}.${boom.ext}`;
+  const touch=matchMedia("(pointer:coarse)").matches;
+  try{
+    if(touch && navigator.canShare){
+      const file=new File([boom.blob], name, {type:boom.type});
+      if(navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:"Photobooth boomerang"}); return; }
+    }
+  }catch(e){ if(e && e.name==="AbortError") return; }
+  const u=URL.createObjectURL(boom.blob); downloadURL(u, name); setTimeout(()=>URL.revokeObjectURL(u), 5000);
+}
 function hideResult(){ els.result.classList.remove("show"); }
 function applyMirror(){ els.mirrorBtn.textContent="Mirror: "+(state.mirror?"On":"Off"); }
 function setStripTheme(id){ if(!STRIP_THEMES.some(t=>t.id===id)) return; state.stripTheme=id; if(els.themeSel) els.themeSel.value=id; }
@@ -709,10 +976,12 @@ els.switchCam.addEventListener("click", ()=>{ if(!state.devices.length) return; 
 els.mirrorBtn.addEventListener("click", ()=>{ state.mirror=!state.mirror; applyMirror(); });
 if(els.themeSel) els.themeSel.addEventListener("change", (e)=>setStripTheme(e.target.value));
 els.bgToggle.addEventListener("click", ()=>{ if(state.aiOn) disableAI(); else enableAI(); });
+document.querySelectorAll("#propSeg button").forEach(b=>b.addEventListener("click",()=>selectProp(b.dataset.prop)));
 els.bgUrlBtn.addEventListener("click", useBgUrl);
 els.bgUrl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") useBgUrl(); });
 els.countSeg.addEventListener("click", (e)=>{ const b=e.target.closest("button[data-n]"); if(!b) return; state.numPhotos=parseInt(b.dataset.n,10); els.countSeg.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b)); });
 els.downloadBtn.addEventListener("click", saveStrip);
+document.querySelector("#boomSave").addEventListener("click", saveBoomerang);
 /* On phones/tablets, "save" opens the native share sheet (Save to Photos,
    AirDrop, Messages…) via the Web Share API; on desktop it downloads. */
 async function saveStrip(){
@@ -765,6 +1034,7 @@ document.addEventListener("keydown", (e)=>{
 
 /* ---------- boot ---------------------------------------------------------- */
 els.brandTitle.textContent=CONFIG.brandTitle; document.title=CONFIG.brandTitle+" · V"+CONFIG.appVersion;
+if(matchMedia("(pointer:coarse)").matches) els.downloadBtn.textContent="📤 Share / save strip";   // touch → share sheet
 applyMirror(); if(els.themeSel) els.themeSel.value=state.stripTheme; renderGallery(); preloadBackgrounds(); checkCollection(); startCamera();
 </script>
 </body>
