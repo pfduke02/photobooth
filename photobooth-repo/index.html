@@ -59,6 +59,11 @@
   #rvRail { display:flex; gap:10px; align-items:flex-end; justify-content:center; flex-wrap:wrap; }
   #rvRail .rvLbl { width:100%; text-align:center; color:#cfd3e0; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
   .rvTheme { cursor:pointer; text-align:center; }
+  #rvStyle { display:none; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap; }
+  #rvStyle .rvLbl { width:100%; text-align:center; color:#cfd3e0; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+  .rvChip { cursor:pointer; border:1px solid #3a3f52; background:#232634; color:var(--ink); border-radius:999px; padding:7px 14px; font:600 13px var(--font); }
+  .rvChip.sel { background:var(--accent); border-color:var(--accent); color:#1b130d; }
+  .rvChip.busy { opacity:.55; pointer-events:none; }
   .rvTheme img { display:block; width:52px; border-radius:6px; border:2px solid #3a3f52; transition:border-color .15s, transform .08s; }
   .rvTheme.sel img { border-color:var(--accent); box-shadow:0 0 0 2px rgba(231,198,155,.3); }
   .rvTheme:hover img { transform:translateY(-2px); }
@@ -117,7 +122,7 @@
 <body>
   <header>
     <h1 id="brandTitle">Photobooth</h1>
-    <p id="brandSub">V2.0 · booth · AI props · cloud + local collection · gallery</p>
+    <p id="brandSub">V2.3 · booth · AI props + restyle · cloud + local collection · gallery</p>
   </header>
 
   <main>
@@ -140,6 +145,7 @@
           <div class="rvTitle">Happy with these? Tap a photo to redo it</div>
           <div id="rvThumbs"></div>
           <div id="rvRail"><div class="rvLbl">Strip style — live preview</div></div>
+          <div id="rvStyle"></div>
           <canvas id="rvBoom" width="640" height="480"></canvas>
           <button class="btn primary" id="rvOk">✓ Make my strip</button>
         </div>
@@ -155,7 +161,10 @@
           <button data-prop="crown" title="Crown">👑</button>
           <button data-prop="tophat" title="Top hat">🎩</button>
           <button data-prop="glasses" title="Sunglasses">🕶</button>
-          <button data-prop="surprise" title="Surprise — a random prop every shot">🎲</button>
+          <button data-prop="flowers" title="Flower crown">🌸</button>
+          <button data-prop="bowtie" title="Bow tie">🎀</button>
+          <button data-prop="hearts" title="Heart eyes">😍</button>
+          <button data-prop="surprise" title="Surprise — every face gets a random prop, new roll every shot">🎲</button>
         </div>
         <!-- Simplified guest UI: Background + Props are the only choices. Shots
              fixed at 4, mirror on, theme via the review rail — remove
@@ -173,6 +182,7 @@
             <option value="wedding">Wedding</option>
             <option value="pop">Pop Art</option>
             <option value="cyan">Cyanotype</option>
+            <option value="comic">Comic</option>
           </select>
         </label>
         <button class="btn ghost" id="galleryLink" title="Browse saved sessions">🖼 Gallery</button>
@@ -225,8 +235,8 @@
   <!-- ?v= busts any stale immutable-cached copy (early deploys served missing
        asset paths as index.html with 200 + our immutable header — Chrome then
        kept executing cached HTML as JS until the URL changed). Bump with appVersion. -->
-  <script src="assets/qrcode.js?v=2.0"></script>
-  <script src="assets/mediapipe/selfie_segmentation.js?v=2.0"></script>
+  <script src="assets/qrcode.js?v=2.2"></script>
+  <script src="assets/mediapipe/selfie_segmentation.js?v=2.2"></script>
 <script>
 /* ============================================================================
    PHOTOBOOTH · V0.5 — local digital photobooth. Two concerns, kept separate:
@@ -283,7 +293,14 @@ const CONFIG = {
     cdn:"https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14",
     model:"https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
   },
-  appVersion:"2.0",
+  // 🎨 Phase 2B — local restyle sidecar (restyle_server.py). Localhost-only:
+  // the sidecar runs on Pete's machine, so the hosted site never sees it. The
+  // review screen offers the styles it reports; the chosen one restyles the
+  // HERO frame (the last shot) in place, before compose/upload — so the strip,
+  // the cloud copy, and the gallery all carry the restyled frame with zero
+  // contract changes. Capture NEVER depends on the sidecar.
+  restyle:{ enabled:true, endpoint:"http://127.0.0.1:8123", timeoutMs:15000 },
+  appVersion:"2.3",
   strip:{ bg:"#ffffff", frame:"#111111", accent:"#c98a6b", text:"#111111", sub:"#8a8a8a" },
   galleryMax:24,
 };
@@ -297,6 +314,8 @@ const BGS = [
   { id:"bokeh",  name:"Bokeh",  kind:"image", src:"assets/backgrounds/bokeh.jpg" },
   { id:"galaxy", name:"Galaxy", kind:"image", src:"assets/backgrounds/galaxy.jpg" },
   { id:"wedding",name:"Wedding",kind:"image", src:"assets/backgrounds/wedding.jpg" },
+  { id:"autumn", name:"Autumn", kind:"image", src:"assets/backgrounds/autumn.jpg" },
+  { id:"fireworks",name:"Fireworks",kind:"image", src:"assets/backgrounds/fireworks.jpg" },
   { id:"color",  name:"Color",  kind:"color", color:"#2f6f4f", icon:"🎨" },
   { id:"custom", name:"＋ Photo", kind:"custom", icon:"＋" },
 ];
@@ -317,6 +336,10 @@ const STRIP_THEMES = [
   { id:"pop",  name:"Pop Art",   bg:"#ffe14d", frame:"#e0362c", accent:"#1c6fd6", text:"#1a1a1a", sub:"#8a5a00", filter:"saturate(2.1) contrast(1.32) brightness(1.04)",
     footer:{ serif:false, upper:true } },
   { id:"cyan", name:"Cyanotype", bg:"#eef4fa", frame:"#1d4e89", accent:"#1d4e89", text:"#173a63", sub:"#5b7ba3", filter:"grayscale(1) sepia(.85) hue-rotate(160deg) saturate(2.6) brightness(.98)",
+    footer:{ serif:false, upper:true } },
+  /* Comic is the one theme with REAL pixel work (pixelFx): posterize to 4
+     levels per channel + a halftone dot screen — Lichtenstein, not a CSS filter. */
+  { id:"comic", name:"Comic", bg:"#ffffff", frame:"#111111", accent:"#e0362c", text:"#111111", sub:"#777777", filter:"saturate(1.65) contrast(1.18)", pixelFx:"comic",
     footer:{ serif:false, upper:true } },
 ];
 
@@ -357,6 +380,7 @@ const state = {
   aiOn:false, currentBg:BGS.find(b=>b.id===CONFIG.ai.defaultBg)||BGS[0], customImg:null,
   stripTheme:"classic",
   prop:"none", rolledProp:null, propShots:[], faces:[],
+  restyleStyles:null, restyleChoice:"none", restyleMs:null,
 };
 let seg=null, segReady=false, rafId=null;
 let faceLm=null, faceLmReady=false, faceLmLoading=false;
@@ -364,6 +388,7 @@ let lastSession=null, collectionAvailable=false;
 
 window.__PB = { ready:false, aiReady:false, done:false, count:0, lastStrip:null, error:null, upload:null,
                 review:{open:false}, retake:null, confirmReview:null, propsReady:false, propDraws:0,
+                restyle:{available:false, styles:[]}, setRestyle:null,
                 enableAI:()=>enableAI(), setBg:(id)=>selectBg(id), setTheme:(id)=>setStripTheme(id), setShots:(n)=>setShots(n),
                 setProp:(id)=>selectProp(id) };
 
@@ -451,10 +476,18 @@ function disableAI(){ state.aiOn=false; els.bgToggle.textContent="✨ Background
    first use) or, with ?fakeface=1, from a synthetic provider so headless tests
    don't need a real face. Props draw on #proc AFTER compositing, so they bake
    into shots, retakes, and the boomerang for free — up to 4 faces at once. */
-const PROP_IDS=["crown","tophat","glasses"];
+const PROP_IDS=["crown","tophat","glasses","flowers","bowtie","hearts"];
 function propsActive(){ return CONFIG.props.enabled && state.prop!=="none"; }
-function activeProp(){ return state.prop==="surprise" ? (state.rolledProp||"crown") : state.prop; }
-function rollProp(){ state.rolledProp=PROP_IDS[Math.floor(Math.random()*PROP_IDS.length)]; }
+/* 🎲 chaos: the roll is an ARRAY — each face (sorted left→right) gets its own
+   random prop, re-rolled every shot. Fixed props ignore the roll. */
+function rollProp(){ state.rolledProp=Array.from({length:CONFIG.props.maxFaces},()=>PROP_IDS[Math.floor(Math.random()*PROP_IDS.length)]); }
+function propForFace(i){ return state.prop==="surprise" ? (state.rolledProp||PROP_IDS)[i%CONFIG.props.maxFaces] : state.prop; }
+function shotPropLabel(){                     // what goes into metadata.propShots for THIS shot
+  if(!propsActive()) return "none";
+  if(state.prop!=="surprise") return state.prop;
+  const n=Math.max(1, Math.min(state.faces.length||1, CONFIG.props.maxFaces));
+  return (state.rolledProp||PROP_IDS).slice(0,n).join("+");
+}
 
 async function initFaceProps(){
   if(faceLmReady) return true;
@@ -482,13 +515,13 @@ function faceGeom(p,w,h){
   const mid={x:(a.x+b.x)/2, y:(a.y+b.y)/2};
   const ipd=Math.hypot(b.x-a.x,b.y-a.y);
   const ang=Math.atan2(b.y-a.y,b.x-a.x);
-  return { eL:a, eR:b, mid, ipd, ang, forehead:{x:M(p.fx), y:p.fy*h} };
+  return { eL:a, eR:b, mid, ipd, ang, forehead:{x:M(p.fx), y:p.fy*h}, chin:{x:M(p.cx!=null?p.cx:p.fx), y:(p.cy!=null?p.cy:p.fy+0.3)*h} };
 }
 function updateFaces(){
   const w=els.proc.width, h=els.proc.height;
   if(FAKEFACE){
     const t=performance.now()/1000, bob=Math.sin(t*2)*0.01;
-    state.faces=[ faceGeom({ exl:.40, eyl:.45+bob, exr:.60, eyr:.45+bob, fx:.5, fy:.30+bob }, w, h) ];
+    state.faces=[ faceGeom({ exl:.40, eyl:.45+bob, exr:.60, eyr:.45+bob, fx:.5, fy:.30+bob, cx:.5, cy:.62+bob }, w, h) ];
     return;
   }
   if(!faceLmReady || !faceLm) return;
@@ -496,14 +529,15 @@ function updateFaces(){
     const res=faceLm.detectForVideo(els.video, performance.now());
     state.faces=(res.faceLandmarks||[]).map(lm=>faceGeom({
       exl:lm[33].x, eyl:lm[33].y, exr:lm[263].x, eyr:lm[263].y,   // outer eye corners
-      fx:lm[10].x,  fy:lm[10].y }, w, h));                        // top of forehead
+      fx:lm[10].x,  fy:lm[10].y,                                  // top of forehead
+      cx:lm[152].x, cy:lm[152].y }, w, h));                       // chin
+    state.faces.sort((a,b)=>a.mid.x-b.mid.x);   // stable left→right order for 🎲 per-face rolls
   }catch(e){ /* keep last faces — a dropped frame never breaks the loop */ }
 }
 
 function drawProps(c){
   if(!propsActive() || !state.faces.length) return;
-  const id=activeProp();
-  for(const f of state.faces){ if(f.ipd>=8) { drawProp(c,id,f); window.__PB.propDraws++; } }
+  state.faces.forEach((f,i)=>{ if(f.ipd>=8){ drawProp(c,propForFace(i),f); window.__PB.propDraws++; } });
 }
 function rr(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
 function drawProp(c,id,f){
@@ -521,6 +555,30 @@ function drawProp(c,id,f){
     c.fillStyle="rgba(255,255,255,.20)";                                                                          // sheen
     rr(c,-cx-lw*0.36,-lh*0.34,lw*0.30,lh*0.20,lh*0.10); c.fill();
     rr(c, cx-lw*0.36,-lh*0.34,lw*0.30,lh*0.20,lh*0.10); c.fill();
+  } else if(id==="bowtie"){
+    // Vector bow tie pinned under the chin.
+    c.translate(f.chin.x,f.chin.y); c.rotate(f.ang);
+    const d=f.ipd*0.34, w=f.ipd*0.52, h=f.ipd*0.40;               // knot offset below chin, wing size
+    c.fillStyle="#171a22"; c.strokeStyle="rgba(0,0,0,.85)"; c.lineWidth=Math.max(1.5,f.ipd*0.035); c.lineJoin="round";
+    c.beginPath(); c.moveTo(-w*0.16,d); c.lineTo(-w,d-h/2); c.quadraticCurveTo(-w*1.12,d,-w,d+h/2); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo( w*0.16,d); c.lineTo( w,d-h/2); c.quadraticCurveTo( w*1.12,d, w,d+h/2); c.closePath(); c.fill(); c.stroke();
+    rr(c,-w*0.18,d-h*0.26,w*0.36,h*0.52,h*0.12); c.fill(); c.stroke();
+    c.fillStyle="rgba(255,255,255,.14)"; rr(c,-w*0.10,d-h*0.18,w*0.20,h*0.14,h*0.06); c.fill();  // sheen
+  } else if(id==="hearts"){
+    // 😍 — a heart over each eye, rotated with the head.
+    c.translate(f.mid.x,f.mid.y); c.rotate(f.ang);
+    c.font=`${Math.round(f.ipd*0.62)}px ${fontStack()}`; c.textAlign="center"; c.textBaseline="middle";
+    c.fillText("❤️",-f.ipd/2,0); c.fillText("❤️",f.ipd/2,0);
+  } else if(id==="flowers"){
+    // 🌸 flower crown — five blooms along an arc at the hairline.
+    c.translate(f.forehead.x,f.forehead.y); c.rotate(f.ang);
+    const petals=["🌼","🌸","🌺","🌸","🌼"], ks=[-0.72,-0.38,0,0.38,0.72];
+    c.textAlign="center"; c.textBaseline="middle";
+    ks.forEach((k,i)=>{
+      const s=f.ipd*(i===2?0.60:(i===1||i===3)?0.52:0.44);
+      c.font=`${Math.round(s)}px ${fontStack()}`;
+      c.fillText(petals[i], k*f.ipd, -(0.06+0.14*(1-Math.abs(k)/0.8))*f.ipd);
+    });
   } else {
     // Emoji props — zero assets; sized by inter-eye distance, rotated with the head.
     const glyph = id==="tophat" ? "🎩" : "👑";
@@ -550,10 +608,29 @@ async function selectProp(id){
 function renderPropSeg(){ document.querySelectorAll("#propSeg button").forEach(b=>b.classList.toggle("active", b.dataset.prop===state.prop)); }
 function setPropSegEnabled(on){ document.querySelectorAll("#propSeg button").forEach(b=>b.disabled=!on); }
 
+/* ---------- 4c) restyle sidecar (Phase 2B) -------------------------------- */
+/* Discover the local model server (restyle_server.py). Localhost-only — the
+   hosted site never probes it. Fire-and-forget; if it's not running, the
+   review screen simply doesn't show the restyle row. */
+async function checkRestyle(){
+  if(!CONFIG.restyle.enabled || !IS_LOCAL_HOST) return;
+  try{
+    const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(),1200);
+    const r=await fetch(CONFIG.restyle.endpoint+"/health",{signal:ctl.signal}); clearTimeout(t);
+    const j=await r.json();
+    if(j && j.ok && Array.isArray(j.styles) && j.styles.length){
+      state.restyleStyles=j.styles;
+      window.__PB.restyle={available:true, styles:j.styles.map(s=>s.id)};
+    }
+  }catch{ /* no sidecar running — that's fine */ }
+}
+
 let toastT=null;
 function showToast(msg){
   let t=$("#toast");
-  if(!t){ t=document.createElement("div"); t.id="toast"; t.style.cssText="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1b1e2b;color:#f3f4f8;border:1px solid #303445;padding:12px 16px;border-radius:12px;max-width:min(560px,92vw);font-size:13px;z-index:50;box-shadow:0 10px 40px rgba(0,0,0,.5)"; document.body.appendChild(t); }
+  /* pointer-events:none — a faded toast is still a DOM box; without this it
+     invisibly eats clicks on whatever sits under it (e.g. the Close button). */
+  if(!t){ t=document.createElement("div"); t.id="toast"; t.style.cssText="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1b1e2b;color:#f3f4f8;border:1px solid #303445;padding:12px 16px;border-radius:12px;max-width:min(560px,92vw);font-size:13px;z-index:50;box-shadow:0 10px 40px rgba(0,0,0,.5);pointer-events:none"; document.body.appendChild(t); }
   t.textContent=msg; t.style.opacity="1"; clearTimeout(toastT); toastT=setTimeout(()=>{ t.style.transition="opacity .4s"; t.style.opacity="0"; },4200);
 }
 
@@ -610,12 +687,13 @@ async function runSession(){
   if(state.busy || !state.stream) return;
   state.busy=true; setControlsEnabled(false); window.__PB.done=false; window.__PB.count=0;
   window.__PB.upload=null;   // stale status from the previous session must not leak into this one
+  state.restyleChoice="none"; state.restyleMs=null; checkRestyle();   // refresh sidecar availability per session
   hideStripQr();
   const shots=[]; buildShotDots(state.numPhotos); state.propShots=[];
   for(let i=0;i<state.numPhotos;i++){
     if(state.prop==="surprise") rollProp();            // 🎲 new prop each shot — guests see it live
     await countdown(CONFIG.countdownSeconds); await flashAndGrab(shots);
-    state.propShots.push(propsActive()?activeProp():"none");
+    state.propShots.push(shotPropLabel());
     markShotDone(i); window.__PB.count=shots.length;
     if(i<state.numPhotos-1) await sleep(GAP_MS);
   }
@@ -699,6 +777,7 @@ function openReview(shots, boomFrames){
   return new Promise((resolve)=>{
     const rv=els.review, tray=els.rvThumbs, ok=els.rvOk;
     let deadline=null, label=null, secsLeft=Math.round(REVIEW_MS/1000), retaking=false, done=false, boomRaf=null;
+    let restyling=false, heroOriginal=null;   // Phase 2B: untouched copy of the hero (last) frame
     function renderThumbs(){
       tray.innerHTML="";
       shots.forEach((c,i)=>{
@@ -724,6 +803,46 @@ function openReview(shots, boomFrames){
         rail.appendChild(d);
       });
     }
+    /* Phase 2B: AI restyle of the HERO frame (the last shot) via the local
+       sidecar. Always restyles from heroOriginal, so switching styles never
+       compounds; "None" restores the untouched frame. */
+    function renderStyleRow(){
+      const row=document.querySelector("#rvStyle");
+      if(!state.restyleStyles || !state.restyleStyles.length){ row.style.display="none"; return; }
+      row.style.display="flex";
+      row.innerHTML='<div class="rvLbl">🎨 AI restyle — last shot</div>';
+      const mk=(id,name)=>{ const b=document.createElement("button"); b.className="rvChip"+(state.restyleChoice===id?" sel":"")+(restyling?" busy":"");
+        b.textContent=name; b.addEventListener("click",()=>applyRestyle(id)); row.appendChild(b); };
+      mk("none","None");
+      state.restyleStyles.forEach(s=>mk(s.id,s.name));
+    }
+    async function applyRestyle(id){
+      if(done||retaking||restyling||id===state.restyleChoice) return;
+      const cv=shots[shots.length-1];
+      if(id==="none"){
+        if(heroOriginal) cv.getContext("2d").drawImage(heroOriginal,0,0);
+        state.restyleChoice="none"; state.restyleMs=null; window.__PB.restyle.applied="none";
+        renderThumbs(); renderRail(); renderStyleRow(); arm(); return;
+      }
+      restyling=true; renderStyleRow();
+      clearTimeout(deadline); clearInterval(label); ok.textContent="🎨 restyling…";   // pause auto-continue
+      try{
+        if(!heroOriginal){ heroOriginal=document.createElement("canvas"); heroOriginal.width=cv.width; heroOriginal.height=cv.height; heroOriginal.getContext("2d").drawImage(cv,0,0); }
+        const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(),CONFIG.restyle.timeoutMs);
+        const r=await fetch(CONFIG.restyle.endpoint+"/restyle",{ method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({ image:heroOriginal.toDataURL("image/jpeg",0.9), style:id }), signal:ctl.signal });
+        clearTimeout(t);
+        const j=await r.json();
+        if(!j.ok) throw new Error(j.error||"restyle failed");
+        await new Promise((res,rej)=>{ const im=new Image();
+          im.onload=()=>{ cv.getContext("2d").drawImage(im,0,0,cv.width,cv.height); res(); };
+          im.onerror=()=>rej(new Error("bad image")); im.src=j.image; });
+        state.restyleChoice=id; state.restyleMs=j.ms||null;
+        window.__PB.restyle.applied=id;
+        renderThumbs(); renderRail();
+      }catch(e){ showToast("Restyle failed ("+String(e&&e.message||e).slice(0,80)+") — keeping the original."); }
+      finally{ restyling=false; renderStyleRow(); arm(); }
+    }
     /* Looping ping-pong preview of the boomerang frames. */
     function startBoomPreview(){
       const bc=document.querySelector("#rvBoom");
@@ -741,29 +860,31 @@ function openReview(shots, boomFrames){
       if(!FAST) label=setInterval(()=>{ secsLeft--; if(secsLeft>0) ok.textContent=`✓ Make my strip (${secsLeft})`; },1000);
     }
     async function doRetake(i){
-      if(retaking||done) return; retaking=true;
+      if(retaking||done||restyling) return; retaking=true;
       clearTimeout(deadline); clearInterval(label);
       rv.classList.remove("show"); window.__PB.review.open=false;
       if(state.prop==="surprise") rollProp();
+      if(i===shots.length-1){ heroOriginal=null; state.restyleChoice="none"; state.restyleMs=null; }  // retaken hero = fresh frame
       await countdown(CONFIG.countdownSeconds);
       await flashAndGrabInto(shots,i);
-      state.propShots[i]=propsActive()?activeProp():"none";
-      renderThumbs(); renderRail();
+      state.propShots[i]=shotPropLabel();
+      renderThumbs(); renderRail(); renderStyleRow();
       rv.classList.add("show"); window.__PB.review.open=true;
       retaking=false; arm();
     }
     function finish(){
-      if(done||retaking) return; done=true;
+      if(done||retaking||restyling) return; done=true;
       clearTimeout(deadline); clearInterval(label);
       if(boomRaf) cancelAnimationFrame(boomRaf);
       rv.classList.remove("show"); window.__PB.review.open=false;
-      window.__PB.retake=null; window.__PB.confirmReview=null;
+      window.__PB.retake=null; window.__PB.confirmReview=null; window.__PB.setRestyle=null;
       resolve();
     }
     ok.onclick=finish;
     window.__PB.retake=(i)=>doRetake(i);
     window.__PB.confirmReview=()=>finish();
-    renderThumbs(); renderRail(); startBoomPreview();
+    window.__PB.setRestyle=(id)=>applyRestyle(id);
+    renderThumbs(); renderRail(); renderStyleRow(); startBoomPreview();
     rv.classList.add("show"); window.__PB.review.open=true; arm();
   });
 }
@@ -787,6 +908,7 @@ function buildSession(shots, stripUrl, boomDataUrl){
     meta:{ version:CONFIG.appVersion, mirror:state.mirror, aiEnabled:state.aiOn, stripTheme:state.stripTheme,
            background: state.aiOn ? state.currentBg.id : "none",
            prop: state.prop, propShots: state.propShots.slice(),
+           restyle: state.restyleChoice, restyleMs: state.restyleMs,
            favorite:false, tags:[], note:"",          // editable later (admin); shape exists from day one
            frameSize: shots[0] ? [shots[0].width, shots[0].height] : null,
            client:{ userAgent:navigator.userAgent, viewport:[window.innerWidth,window.innerHeight], dpr:window.devicePixelRatio||1 } },
@@ -905,6 +1027,7 @@ function composeStrip(shots, themeId, scale){
     ctx.filter=T.filter||"none";
     ctx.drawImage(shot, sx,sy,sw,sh, SIDE,y,frameW,frameH);
     ctx.filter="none";
+    if(T.pixelFx==="comic") applyComicCell(ctx, SIDE, y, frameW, frameH, S);
   });
   const F=T.footer||{};
   ctx.textAlign="center";
@@ -925,6 +1048,26 @@ function composeStrip(shots, themeId, scale){
   ctx.fillText((F.l2!=null)?F.l2:(CONFIG.brandSubtitle||dateLabel()), stripW/2, footerY+86);
   try { return c.toDataURL("image/png"); }
   catch(e){ showToast("Export blocked — a cross-origin background tainted the canvas. Upload the image instead of using its URL."); return null; }
+}
+/* Comic pixel pass on one strip cell: quantize RGB to 4 levels, then screen a
+   grid of black halftone dots sized by darkness. Runs in DEVICE pixels (the
+   strip ctx is scale(S,S)-transformed; getImageData ignores transforms). */
+function applyComicCell(ctx,x,y,w,h,S){
+  const dx=Math.round(x*S), dy=Math.round(y*S), dw=Math.round(w*S), dh=Math.round(h*S);
+  let img; try{ img=ctx.getImageData(dx,dy,dw,dh); }catch(e){ return; }   // tainted-canvas guard
+  const d=img.data;
+  for(let i=0;i<d.length;i+=4){ d[i]=((d[i]/85+0.5)|0)*85; d[i+1]=((d[i+1]/85+0.5)|0)*85; d[i+2]=((d[i+2]/85+0.5)|0)*85; }
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0);
+  ctx.putImageData(img,dx,dy);
+  const step=Math.max(4,Math.round(4.5*S));
+  ctx.fillStyle="rgba(18,18,18,.30)"; ctx.beginPath();
+  for(let gy=step>>1; gy<dh; gy+=step){
+    for(let gx=step>>1; gx<dw; gx+=step){
+      const p=((gy|0)*dw+(gx|0))*4, lum=0.299*d[p]+0.587*d[p+1]+0.114*d[p+2];
+      if(lum<175){ const r=(1-lum/255)*step*0.42; ctx.moveTo(dx+gx+r,dy+gy); ctx.arc(dx+gx,dy+gy,r,0,6.2832); }
+    }
+  }
+  ctx.fill(); ctx.restore();
 }
 const fontStack=()=>'system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
 const serifStack=()=>'Georgia,"Times New Roman",Times,serif';
@@ -1035,7 +1178,7 @@ document.addEventListener("keydown", (e)=>{
 /* ---------- boot ---------------------------------------------------------- */
 els.brandTitle.textContent=CONFIG.brandTitle; document.title=CONFIG.brandTitle+" · V"+CONFIG.appVersion;
 if(matchMedia("(pointer:coarse)").matches) els.downloadBtn.textContent="📤 Share / save strip";   // touch → share sheet
-applyMirror(); if(els.themeSel) els.themeSel.value=state.stripTheme; renderGallery(); preloadBackgrounds(); checkCollection(); startCamera();
+applyMirror(); if(els.themeSel) els.themeSel.value=state.stripTheme; renderGallery(); preloadBackgrounds(); checkCollection(); checkRestyle(); startCamera();
 </script>
 </body>
 </html>

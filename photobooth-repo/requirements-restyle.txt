@@ -1,0 +1,8 @@
+# Phase 2B restyle sidecar — pip3 install -r requirements-restyle.txt
+fastapi
+uvicorn
+pillow
+numpy
+opencv-contrib-python-headless
+onnx
+onnxruntime

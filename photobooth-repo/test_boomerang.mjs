@@ -35,7 +35,7 @@ const vidShown=await page.$eval('#boomVid',el=>getComputedStyle(el).display!=='n
 console.log('upload:',up.status,up.id,' boomerang:',JSON.stringify(boomInfo),' save-btn:',boomBtn,' video shown:',vidShown);
 
 let ok=true;
-if(railCount!==6||!railImgsLoaded){ console.error('FAIL: theme rail'); ok=false; }
+if(railCount!==7||!railImgsLoaded){ console.error('FAIL: theme rail'); ok=false; }
 if(!boomVisible){ console.error('FAIL: boom preview'); ok=false; }
 if(!selIsWedding){ console.error('FAIL: rail selection'); ok=false; }
 if(up.status!=='saved'){ console.error('FAIL: not saved'); ok=false; }

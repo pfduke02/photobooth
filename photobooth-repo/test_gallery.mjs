@@ -65,6 +65,32 @@ if(optVals.includes('classic')){
   const cnt=await gp.$eval('#fCount',el=>el.textContent);
   console.log('filter smoke: classic→'+cl+' reset→'+back+'  count="'+cnt+'"');
 } else { console.log('filter smoke skipped (no classic option?)'); filterOk=false; }
+// ---- V2.3: text search smoke — an id substring must narrow to that session ----
+let searchOk=true;
+const targetId=up.id, needle=targetId.slice(-6);   // unique per-session suffix
+await gp.fill('#fText', needle); await gp.waitForTimeout(200);
+const found=await gp.$$eval('.card',els=>els.length);
+await gp.fill('#fText', 'zzz-no-match-zzz'); await gp.waitForTimeout(200);
+const none=await gp.$$eval('.card',els=>els.length);
+await gp.fill('#fText',''); await gp.waitForTimeout(200);
+console.log(`search smoke: "${needle}"→${found} card(s), garbage→${none}`);
+if(found<1 || none!==0){ console.error('FAIL: text search'); searchOk=false; }
+
+// ---- V2.3: 4×6 print sheet — 1200×1800 PNG composed from the strip ----
+await gp.click('.card');
+await gp.waitForSelector('#modal.show',{timeout:5000});
+await gp.evaluate(()=>{ window.__dl=null; const orig=HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click=function(){ if(this.download){ window.__dl={name:this.download,len:(this.href||'').length}; } else orig.call(this); }; });
+await gp.evaluate(()=>document.querySelector('#mPrint').click());
+await gp.waitForFunction(()=>window.__PBG_lastPrint,null,{timeout:10000});
+const psheet=await gp.evaluate(()=>window.__PBG_lastPrint);
+const dl=await gp.evaluate(()=>window.__dl);
+console.log('print sheet:', JSON.stringify(psheet), ' download:', JSON.stringify(dl));
+let printOk=true;
+if(!psheet || psheet.w!==1200 || psheet.h!==1800 || psheet.bytes<20000){ console.error('FAIL: print sheet dims'); printOk=false; }
+if(!dl || !/print-4x6\.png$/.test(dl.name)){ console.error('FAIL: print download name'); printOk=false; }
+await gp.click('#mClose').catch(()=>{});
+
 await gp.click('.card');
 await gp.waitForSelector('#modal.show',{timeout:5000});
 await gp.waitForFunction(()=>{ const i=document.querySelector('#mStrip'); return i&&i.complete&&i.naturalWidth>0; },null,{timeout:8000}).catch(()=>{});
@@ -83,5 +109,7 @@ if(!stripHead.ok || !/image\/png/.test(stripHead.type||'')){ console.error('FAIL
 if(!(cards>=1)){ console.error('FAIL: no gallery cards'); ok=false; }
 if(!bigLoaded || frameThumbs!==4 || !thumbLoaded){ console.error('FAIL: detail modal images'); ok=false; }
 if(!filterOk){ console.error('FAIL: filter smoke'); ok=false; }
+if(!searchOk){ console.error('FAIL: search'); ok=false; }
+if(!printOk){ console.error('FAIL: print sheet'); ok=false; }
 console.log(ok?'PASS ✅':'FAIL ❌');
 process.exit(ok?0:1);

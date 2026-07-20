@@ -64,6 +64,7 @@
     <select id="fShots" class="fsel"><option value="">Shots: all</option><option value="3">3 shots</option><option value="4">4 shots</option></select>
     <select id="fProp" class="fsel"><option value="">Prop: all</option></select>
     <label id="fFavLbl"><input type="checkbox" id="fFav" /> ♥ favorites only</label>
+    <input type="text" id="fText" class="fsel" placeholder="🔎 search notes, tags, id…" style="min-width:180px" />
     <input type="date" id="fFrom" class="fsel" title="From date" />
     <input type="date" id="fTo" class="fsel" title="To date" />
     <span id="fCount"></span>
@@ -82,6 +83,7 @@
         <div class="row">
           <a class="btn primary" id="mDownload" download>⬇ Strip PNG</a>
           <button class="btn" id="mSheet">⬇ Contact sheet</button>
+          <button class="btn" id="mPrint" title="Two copies of this strip on one 4×6 sheet — the format photo printers (e.g. Canon SELPHY) cut in half">🖨 4×6 print sheet</button>
         </div>
         <div class="muted">Original frames (click to download):</div>
         <div class="frames" id="mFrames"></div>
@@ -140,7 +142,7 @@ async function adminCall(payload){
 let gtoastT=null;
 function gtoast(msg){
   let t=$("#gtoast");
-  if(!t){ t=document.createElement("div"); t.id="gtoast"; t.style.cssText="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1b1e2b;color:#f3f4f8;border:1px solid #303445;padding:11px 16px;border-radius:12px;max-width:min(520px,92vw);font:600 13px var(--font);z-index:70;box-shadow:0 10px 40px rgba(0,0,0,.5)"; document.body.appendChild(t); }
+  if(!t){ t=document.createElement("div"); t.id="gtoast"; t.style.cssText="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1b1e2b;color:#f3f4f8;border:1px solid #303445;padding:11px 16px;border-radius:12px;max-width:min(520px,92vw);font:600 13px var(--font);z-index:70;box-shadow:0 10px 40px rgba(0,0,0,.5);pointer-events:none"; document.body.appendChild(t); }
   t.textContent=msg; t.style.opacity="1"; clearTimeout(gtoastT); gtoastT=setTimeout(()=>{ t.style.transition="opacity .4s"; t.style.opacity="0"; },3800);
 }
 
@@ -195,10 +197,15 @@ function applyFilters(){
   const th=$("#fTheme").value, bg=$("#fBg").value, ai=$("#fAi").value,
         ns=$("#fShots").value, fav=$("#fFav").checked, pr=$("#fProp").value;
   const from=$("#fFrom").value, to=$("#fTo").value;
+  const tx=$("#fText").value.trim().toLowerCase();
+  const hay=(s)=>[s.id, s.note, (s.tags||[]).join(" "), s.stripTheme, s.background, s.prop,
+                  s.meta&&s.meta.restyle, s.meta&&(s.meta.propShots||[]).join(" ")]
+                 .filter(Boolean).join(" ").toLowerCase();
   view = sessions.filter(s=>
     (!th || s.stripTheme===th) &&
     (!bg || s.background===bg) &&
     (!pr || s.prop===pr) &&
+    (!tx || hay(s).includes(tx)) &&
     (!ai || (ai==="on" ? s.aiEnabled===true : s.aiEnabled===false)) &&
     (!ns || String(s.numPhotos)===ns) &&
     (!fav || s.favorite) &&
@@ -219,7 +226,8 @@ function render(){
     const bits=[];
     if(s.stripTheme) bits.push(`<span class="badge">${s.stripTheme}</span>`);
     if(s.background && s.background!=="none") bits.push(`<span class="badge">${s.background}</span>`);
-    if(s.prop && s.prop!=="none") bits.push(`<span class="badge">${s.prop==="crown"?"👑":s.prop==="tophat"?"🎩":s.prop==="glasses"?"🕶":"🎲"} ${s.prop}</span>`);
+    if(s.prop && s.prop!=="none") bits.push(`<span class="badge">${s.prop==="crown"?"👑":s.prop==="tophat"?"🎩":s.prop==="glasses"?"🕶":s.prop==="flowers"?"🌸":s.prop==="bowtie"?"🎀":s.prop==="hearts"?"😍":"🎲"} ${s.prop}</span>`);
+    if(s.meta&&s.meta.restyle&&s.meta.restyle!=="none") bits.push(`<span class="badge">🎨 ${s.meta.restyle}</span>`);
     if(s.favorite) bits.push(`<span class="badge">♥</span>`);
     card.innerHTML = `<img class="strip" loading="lazy" src="${s.strip||""}" alt="${s.id}" />
       <div class="meta"><div class="d">${fmtDate(s.createdAt)}</div>
@@ -239,6 +247,7 @@ function openDetail(i){
     <div><b>Background:</b> ${s.background||"none"}</div>
     <div><b>AI:</b> ${s.aiEnabled===true?"on":s.aiEnabled===false?"off":"—"}</div>
     ${s.prop&&s.prop!=="none"?`<div><b>Prop:</b> ${s.prop}${s.prop==="surprise"&&s.meta&&s.meta.propShots?` (${s.meta.propShots.join(", ")})`:""}</div>`:""}
+    ${s.meta&&s.meta.restyle&&s.meta.restyle!=="none"?`<div><b>Restyle:</b> 🎨 ${s.meta.restyle}${s.meta.restyleMs?` (${s.meta.restyleMs} ms)`:""}</div>`:""}
     ${s.tags&&s.tags.length?`<div><b>Tags:</b> ${s.tags.join(", ")}</div>`:""}
     ${s.note?`<div><b>Note:</b> ${s.note}</div>`:""}
     <div><b>Folder:</b> sessions/${s.id}/</div>`;
@@ -246,6 +255,7 @@ function openDetail(i){
   const fr=$("#mFrames"); fr.innerHTML="";
   s.frames.forEach((f,idx)=>{ const im=document.createElement("img"); im.src=f; im.title=`frame-${idx+1}`; im.addEventListener("click",()=>downloadUrl(f,`${s.id}_frame-${idx+1}.jpg`)); fr.appendChild(im); });
   $("#mSheet").onclick=()=>contactSheet(s);
+  $("#mPrint").onclick=()=>printSheet(s);
   const mb=$("#mBoom");
   if(s.boomerang){ mb.src=s.boomerang; mb.style.display=""; } else { mb.removeAttribute("src"); mb.style.display="none"; }
   const ab=$("#adminBox");
@@ -287,8 +297,30 @@ async function contactSheet(s){
   c.toBlob((b)=>{ const u=URL.createObjectURL(b); downloadUrl(u,`${s.id}_contact-sheet.png`); setTimeout(()=>URL.revokeObjectURL(u),4000); }, "image/png");
 }
 
+/* 4×6" @300dpi print sheet (1200×1800): TWO copies of the strip side by side
+   with a dashed cut line — the standard photobooth print format (a Canon
+   SELPHY or any 4×6 photo printer prints it; cut down the middle, keep one,
+   give one away). Strips are print-true 2×6" already, so this is lossless. */
+async function printSheet(s){
+  if(!s.strip) return;
+  try{
+    const im=await new Promise((res,rej)=>{ const i=new Image(); i.crossOrigin="anonymous"; i.onload=()=>res(i); i.onerror=()=>rej(new Error("couldn't load the strip image")); i.src=s.strip; });
+    const c=document.createElement("canvas"); c.width=1200; c.height=1800;
+    const ctx=c.getContext("2d"); ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,1200,1800);
+    ctx.imageSmoothingQuality="high";
+    ctx.drawImage(im,0,0,600,1800); ctx.drawImage(im,600,0,600,1800);
+    ctx.strokeStyle="rgba(0,0,0,.25)"; ctx.setLineDash([12,10]); ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(600,0); ctx.lineTo(600,1800); ctx.stroke();
+    const du=c.toDataURL("image/png");
+    window.__PBG_lastPrint={ w:c.width, h:c.height, bytes:du.length };
+    downloadUrl(du, `${s.id}_print-4x6.png`);
+  }catch(e){ gtoast("Print sheet failed: "+(e.message||e)); }
+}
+window.__PBG={ printSheet:(i)=>printSheet(view[i||0]) };
+
 $("#refresh").addEventListener("click", load);
 ["fTheme","fBg","fAi","fShots","fProp","fFrom","fTo"].forEach(id=>$("#"+id).addEventListener("change", applyFilters));
+$("#fText").addEventListener("input", applyFilters);
 $("#fFav").addEventListener("change", applyFilters);
 if(IS_ADMIN){
   $("#adminBadge").style.display="";

@@ -9,7 +9,7 @@ const page=await ctx.newPage();
 page.on('pageerror',e=>console.log('[pageerror]',e.message));
 await page.goto('http://localhost:8099/?fast=1&collect=local',{waitUntil:'load'});
 await page.waitForFunction(()=>window.__PB&&window.__PB.ready,null,{timeout:15000});
-const themes=['classic','noir','warm','wedding','pop','cyan']; let ok=true;
+const themes=['classic','noir','warm','wedding','pop','cyan','comic']; let ok=true;
 for(const t of themes){
   const set=await page.evaluate((id)=>{ window.__PB.setTheme(id); return document.querySelector('#themeSel').value; }, t);
   await page.click('#startBtn');

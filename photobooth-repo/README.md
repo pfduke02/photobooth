@@ -1,4 +1,4 @@
-# Photobooth · V2.0
+# Photobooth · V2.3
 
 A browser-based digital photobooth with **cloud + local collection**, live at
 **https://photobooth-c7s.pages.dev/**.
@@ -77,6 +77,42 @@ fallback — early deploys had let browsers immutable-cache the homepage HTML
 *as* the model script, which broke background replace until a hard reload.
 Headless testing: `?fakeface=1` feeds synthetic landmarks so the prop
 pipeline is testable without a real face (`test_props.mjs`).
+**V2.0.1** makes toasts click-transparent (a faded toast was invisibly
+blocking the result screen's Close button).
+
+**V2.3 — gallery upgrades:** **🔎 text search** in the filter bar — matches
+id, notes, tags, theme, background, props (incl. per-shot surprise rolls),
+and restyle, instantly, combinable with every other filter. **🖨 4×6 print
+sheet** — one click in the session detail composes TWO copies of the strip
+onto a 1200×1800 (4×6" @300dpi) PNG with a dashed cut line: the standard
+photobooth print format, ready for a Canon SELPHY or any photo printer.
+
+**V2.2 — Phase 2B, the model sidecar:** a local Python model server
+(`restyle_server.py`, FastAPI on `127.0.0.1:8123`) the booth discovers
+automatically when running on localhost. The review screen gains **"🎨 AI
+restyle — last shot"**: Oil paint / Pencil / Cartoon (OpenCV, ~100 ms) and
+**Mosaic / Candy** (ONNX fast-neural-style, ~0.3–1.5 s CPU — the models
+auto-download on first run, and their fixed 224×224 graphs are patched to
+dynamic H×W so they run at real resolution). The chosen style restyles the
+**hero frame (the last shot) in place** before compose/upload — strip, cloud,
+and gallery all carry it with zero contract changes; switching styles always
+re-restyles from the untouched original; retaking the hero resets it.
+Restyle is **localhost-only** (the hosted site never probes the sidecar), and
+capture never depends on it. Run it:
+
+```bash
+pip3 install -r requirements-restyle.txt
+python3 restyle_server.py    # alongside node server.mjs
+```
+
+**V2.1 — 2A polish:** wedding props — **🌸 flower crown, 🎀 bow tie (vector,
+chin-anchored), 😍 heart eyes** join 👑🎩🕶; **🎲 is now per-face chaos**
+(each face gets its own random prop, new roll every shot, recorded like
+`"crown+hearts"` in metadata). New **Comic** strip theme with real pixel work
+(4-level posterize + halftone dot screen — not a CSS filter). Backgrounds:
+**studio / bokeh / neon regenerated** at higher quality, and two new
+backdrops — **Autumn** (golden-hour leaves, for a November wedding) and
+**Fireworks**.
 
 - **Booth** — webcam → 3s countdown → 3/4 photos → strip PNG → gallery →
   download. On-device AI background replace (incl. the Lisa & Pete wedding
@@ -142,11 +178,15 @@ npm install playwright
 node server.mjs &
 node test.mjs && node test_collection.mjs && node test_gallery.mjs \
   && node test_themes.mjs && node test_both.mjs && node test_retake.mjs \
-  && node test_admin.mjs && node test_boomerang.mjs && node test_props.mjs
+  && node test_admin.mjs && node test_boomerang.mjs && node test_props.mjs \
+  && node test_restyle.mjs
 ```
+
+(`test_restyle.mjs` spawns the real Python sidecar — true end-to-end.)
 
 ## What's next
 
-Phase 2B — a local img2img restyle (the GenAI learning goal); gallery text
-search; printing (strips are already print-true 2×6" @300dpi). Central Park
-backdrop still needs the photo file. See `ROADMAP.md`.
+Phase 2B stretch — swap a diffusion img2img (Stable Diffusion / ControlNet)
+into the same `/restyle` endpoint; gallery text search; printing (strips are
+already print-true 2×6" @300dpi). Central Park backdrop still needs the photo
+file. See `ROADMAP.md`.

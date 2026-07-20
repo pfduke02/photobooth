@@ -114,22 +114,52 @@ fix: versioned asset URLs + `404.html` end the immutable-cached-HTML-as-JS
 failure ("Couldn't load the segmentation model" on the live site). 9 headless
 suites green (`test_props.mjs` new, via `?fakeface=1` synthetic landmarks).
 
+**V2.1 (shipped) — 2A polish, all four of Pete's picks:** ✅ **wedding prop
+set** — 🌸 flower crown (five blooms on a hairline arc), 🎀 vector bow tie
+(chin landmark), 😍 heart eyes; prop row is now 6 props + 🎲. ✅ **Comic**
+strip theme — real pixel work (posterize to 4 levels + halftone dot screen),
+live in the review rail like the rest. ✅ **per-face surprise chaos** — 🎲
+now rolls a different prop for every face (left→right), re-rolled each shot;
+rolls recorded as `"crown+hearts"` in metadata. ✅ **background pack v2** —
+studio/bokeh/neon regenerated (soft key light / layered golden orbs / glowing
+tubes+rings), plus **Autumn** (golden-hour leaves — November wedding) and
+**Fireworks**. 9 suites green.
+
+**V2.2 (shipped) — Phase 2B, tier B begins:** ✅ **restyle sidecar** —
+`restyle_server.py` (FastAPI, port 8123): 3 OpenCV styles (oil/pencil/
+cartoon, ~100 ms) + 2 neural fast-style ONNX models (mosaic/candy, ~0.3–1.5 s
+CPU) that auto-download on first run; their fixed 224×224 graphs get patched
+to dynamic H×W so they run at real resolution. ✅ booth integration — the
+review screen shows "🎨 AI restyle — last shot" when the sidecar is up
+(localhost only); the style restyles the **hero frame in place** before
+compose/upload (zero contract changes — strip/cloud/gallery all carry it);
+always re-restyled from the untouched original; retaking the hero resets it;
+`meta.restyle` + `restyleMs` recorded and shown in the gallery. Tier-B
+learning goals hit: model serving, ONNX graph surgery, latency budgeting
+(downscale-before-style, hero-frame-only). 10 suites green —
+`test_restyle.mjs` spawns the real Python sidecar.
+
+**V2.3 (shipped, unattended block):** ✅ **gallery text search** (id/notes/
+tags/theme/background/props/restyle, instant, stacks with all filters) ·
+✅ **4×6 print sheet** (two strip copies on a 1200×1800 @300dpi PNG with a
+dashed cut line — the software half of printing done; what remains is
+hardware + a print queue) · ✅ **cloud audit**: 0 security lints, 0
+performance lints, 11 sessions (app versions 1.0/1.3/2.0), 61 files / 65 MB
+in storage, 1 known orphan prefix (Pete's 🧹 admin button clears it).
+
 ## Next steps (agreed order)
 
-1. **Phase 2B** — a local Python img2img restyle (tier B: model serving,
-   ControlNet/img2img, latency budgeting) on one "hero" frame per strip.
-2. **Text search** over notes/tags in the gallery.
-3. **Background pack polish** (later version, per Pete) — refine/replace the
-   generated backdrops: real-photo options, better studio/bokeh, seasonal sets.
-   Restore the shots (3/4) and mirror choosers when wanted — hidden since
+1. **Phase 2B stretch** — swap a real diffusion img2img (Stable Diffusion /
+   ControlNet via diffusers on Apple Silicon MPS) into the same `/restyle`
+   endpoint; prompt-driven styles ("oil painting of us", "anime poster").
+   Needs Pete's Mac (models are GB-scale — won't fit the build sandbox).
+2. Restore the shots (3/4) and mirror choosers when wanted — hidden since
    V1.2, each a one-line `display:none` removal (theme choice is back via the
    V1.4 review rail).
-4. **Central Park backdrop** — blocked on receiving the proposal photo file.
-5. **Printing** — Pete: not available today but "eventually will be needed."
-   Canon SELPHY dye-sub path per HARDWARE.md (two 2×6 strips per 4×6 sheet);
-   strips are already print-true 2×6" @300dpi, so this is hardware + a print
-   dialog/queue, no image-pipeline work.
-6. (~V4) custom domain; remaining hardware per HARDWARE.md.
+3. **Central Park backdrop** — blocked on receiving the proposal photo file.
+4. **Printing (hardware half)** — Canon SELPHY per HARDWARE.md; the 4×6
+   print sheet is ready for it as of V2.3.
+5. (~V4) custom domain; remaining hardware per HARDWARE.md.
 
 Files: `index.html` (app), `gallery.html`, `server.mjs`/`server.py` (local
 backend), `sync.py` (cloud→local mirror + auto-sync), `test*.mjs` (8 headless

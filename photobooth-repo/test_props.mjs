@@ -19,7 +19,7 @@ let ok=true;
 // picker row: visible, 5 options, crown first among props
 const props=await page.$$eval('#propSeg button',els=>els.map(b=>b.dataset.prop));
 console.log('prop options:',props.join(','));
-if(props.join(',')!=='none,crown,tophat,glasses,surprise'){ console.error('FAIL: prop row options'); ok=false; }
+if(props.join(',')!=='none,crown,tophat,glasses,flowers,bowtie,hearts,surprise'){ console.error('FAIL: prop row options'); ok=false; }
 
 // select 🕶 via the UI; fakeface → ready instantly, draws every frame
 await page.click('#propSeg button[data-prop="glasses"]');
@@ -62,8 +62,9 @@ else{
   const meta=JSON.parse(fs.readFileSync(path.join(OUT,'sessions',up2.id,'metadata.json'),'utf8'));
   console.log('session2 prop:',meta.prop,' shots:',JSON.stringify(meta.propShots));
   if(meta.prop!=='surprise'){ console.error('FAIL: meta.prop surprise'); ok=false; }
-  const pool=['crown','tophat','glasses'];
-  if(!Array.isArray(meta.propShots)||meta.propShots.length!==4||!meta.propShots.every(p=>pool.includes(p))){ console.error('FAIL: surprise propShots'); ok=false; }
+  const pool=['crown','tophat','glasses','flowers','bowtie','hearts'];
+  // per-face chaos records "a+b+…" per shot; every component must be a real prop
+  if(!Array.isArray(meta.propShots)||meta.propShots.length!==4||!meta.propShots.every(s=>s.split('+').every(p=>pool.includes(p)))){ console.error('FAIL: surprise propShots'); ok=false; }
 }
 
 await browser.close();
