@@ -23,10 +23,11 @@
   header { text-align:center; padding:18px 16px 6px; }
   header h1 { margin:0; font-size:20px; letter-spacing:.35em; text-transform:uppercase; font-weight:600; }
   header p { margin:4px 0 0; color:var(--muted); font-size:13px; }
-  main { flex:1; display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; padding:12px 20px 20px; max-width:1180px; width:100%; margin:0 auto; }
+  main { flex:1; display:grid; grid-template-columns:1fr; gap:20px; padding:12px 20px 20px; max-width:1100px; width:100%; margin:0 auto; }
   @media (max-width:880px){ main{ grid-template-columns:1fr; } #galleryPanel{ order:3; } }
 
-  #stage { position:relative; background:#000; border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow); aspect-ratio:4/3; display:flex; align-items:center; justify-content:center; }
+  header { display:none; }   /* simplified: hide the title + subtitle */
+  #stage { position:relative; background:#000; border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow); aspect-ratio:4/3; max-height:74vh; display:flex; align-items:center; justify-content:center; }
   #video { position:absolute; width:2px; height:2px; opacity:0; pointer-events:none; }
   #proc { width:100%; height:100%; object-fit:cover; display:block; background:#000; }
   #countdown { position:absolute; inset:0; display:none; align-items:center; justify-content:center; font-size:clamp(90px,22vw,240px); font-weight:800; color:#fff; text-shadow:0 6px 40px rgba(0,0,0,.6); pointer-events:none; }
@@ -74,10 +75,13 @@
   #rvBoomLbl { display:none; color:#cfd3e0; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
 
   #controls { margin-top:14px; display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; }
-  #startBtn { font-size:19px; padding:16px 32px; border-radius:14px; }
+  #startBtn { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:6; font-size:clamp(20px,3.4vw,30px); padding:20px 46px; border-radius:16px; }
+  #startBtn:disabled { opacity:0; pointer-events:none; }
+  .ctlGroup { display:none; }   /* simplified: no Background / Props chooser for guests */
+  #rvRail { display:none; }      /* simplified: one strip look (ivory & gold), no theme picker in review */
   #startBtn:not(:disabled) { animation:startPulse 2.4s ease-in-out infinite; }
   @keyframes startPulse { 0%,100% { box-shadow:0 0 0 0 rgba(201,138,107,.45); } 55% { box-shadow:0 0 0 12px rgba(201,138,107,0); } }
-  .ctlGroup { display:flex; flex-direction:column; gap:4px; }
+  .ctlGroup { display:none; }   /* simplified: Background + Props hidden for guests */
   .ctlLbl { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:700; padding-left:2px; }
   #utilRow { margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
   .btn.sm { font-size:13px; padding:8px 12px; opacity:.85; }
@@ -144,6 +148,7 @@
         <div id="countdown"></div>
         <div id="prompt">Smile! 📸</div>
         <div id="flash"></div>
+        <button class="btn primary" id="startBtn" disabled>📸 Start</button>
         <div id="camError">
           <div class="big">📷</div>
           <div id="camErrorMsg">Camera not available.</div>
@@ -162,9 +167,8 @@
       </div>
 
       <div id="controls">
-        <!-- V2.4 layout: ONE big obvious action (Start), then the guest's two
-             labeled choices. Pete-facing utilities live in #utilRow below. -->
-        <button class="btn primary" id="startBtn" disabled>📸 Start</button>
+        <!-- Start button moved onto the camera stage (see #stage). -->
+
         <div class="ctlGroup">
           <div class="ctlLbl">Background</div>
           <button class="btn ghost" id="bgToggle">✨ Off</button>
@@ -186,8 +190,8 @@
              fixed at 4, mirror on, theme via the review rail — remove
              display:none to bring these back. -->
         <div class="seg" id="countSeg" title="Photos per strip" style="display:none">
-          <button data-n="3">3 shots</button>
-          <button data-n="4" class="active">4 shots</button>
+          <button data-n="3" class="active">3 shots</button>
+          <button data-n="4">4 shots</button>
         </div>
         <button class="btn ghost" id="mirrorBtn" title="Mirror preview" style="display:none">Mirror: On</button>
         <label class="hint" style="display:none">Strip
@@ -233,10 +237,10 @@
       <div id="resultActions">
         <h3>Nice strip! ✨</h3>
         <p id="uploadStatus" class="ustat"></p>
-        <div id="stripQr" style="display:none; text-align:center; background:#fff; border-radius:12px; padding:10px; margin:2px 0 6px;">
-          <img id="stripQrImg" alt="QR code for this strip" style="width:132px; height:132px; image-rendering:pixelated; display:block; margin:0 auto;" />
-          <div style="font:700 12px var(--font); color:#222; margin-top:6px;">📱 Scan — your strip opens on your phone</div>
-          <div style="font:500 10.5px var(--font); color:#666; margin-top:3px;">then press &amp; hold the photo and tap “Save to Photos” / “Add to Photos”</div>
+        <div id="stripQr" style="display:none; text-align:center; background:#fff; border-radius:12px; padding:12px; margin:2px 0 8px;">
+          <img id="stripQrImg" alt="QR code for this strip" style="width:158px; height:158px; image-rendering:pixelated; display:block; margin:0 auto;" />
+          <div id="stripQrCap" style="font:700 13px var(--font); color:#222; margin-top:7px;">📱 Scan to get your photos on your phone</div>
+          <div id="stripQrSub" style="font:500 10.5px var(--font); color:#666; margin-top:3px;">press &amp; hold the photo → “Save to Photos”</div>
         </div>
         <video id="boomVid" loop muted playsinline autoplay style="display:none; width:100%; max-width:240px; border-radius:10px; border:1px solid #303445;"></video>
         <button class="btn primary" id="againBtn">↺ Take another</button>
@@ -273,7 +277,7 @@
 /* ---------- 1) CONFIG ------------------------------------------------------ */
 const CONFIG = {
   brandTitle:"Photobooth", brandSubtitle:"", stripFooter:"PHOTOBOOTH",
-  numPhotos:4, countdownSeconds:3, betweenShotsMs:900,
+  numPhotos:3, countdownSeconds:3, betweenShotsMs:900,
   mirror:true, exportScale:2, frameAspect:4/3,
   ai:{ modelSelection:1, featherPx:2, blurPx:16, defaultBg:"blur" },
   // COLLECTION: after each session, POST {strip, frames[], meta} to an endpoint.
@@ -348,7 +352,7 @@ const STRIP_THEMES = [
   { id:"warm",    name:"Warm Film", bg:"#f6efe3", frame:"#5a4632", accent:"#c08a4a", text:"#4a3826", sub:"#9a836a", filter:"sepia(0.35) saturate(1.15) contrast(1.02)",
     footer:{ serif:false, upper:true } },
   { id:"wedding", name:"Wedding",   bg:"#faf6f0", frame:"#c2a15a", accent:"#c2a15a", text:"#4a4038", sub:"#8a7f72", filter:"none",
-    footer:{ serif:true, upper:false, l1:"Lisa & Pete", l2:"November 7th · 2026" } },
+    footer:{ serif:true, upper:false, heart:true, l1:"Lisa & Pete", l2:"November 7th · 2026" } },
   /* Phase 2A style filters — pure CSS canvas filters, so they preview live in
      the review rail and cost nothing at compose time. */
   { id:"pop",  name:"Pop Art",   bg:"#ffe14d", frame:"#e0362c", accent:"#1c6fd6", text:"#1a1a1a", sub:"#8a5a00", filter:"saturate(2.1) contrast(1.32) brightness(1.04)",
@@ -396,7 +400,7 @@ const state = {
   stream:null, devices:[], deviceIndex:0,
   numPhotos:CONFIG.numPhotos, mirror:CONFIG.mirror, busy:false, lastStripURL:null,
   aiOn:false, currentBg:BGS.find(b=>b.id===CONFIG.ai.defaultBg)||BGS[0], customImg:null,
-  stripTheme:"classic",
+  stripTheme:"wedding",
   prop:"none", rolledProp:null, propShots:[], faces:[],
   restyleStyles:null, restyleChoice:"none", restyleMs:null,
 };
@@ -973,15 +977,26 @@ function showStripQr(url){
   try{
     if(typeof qrcode==="undefined"||!url) return;
     const qr=qrcode(0,"M"); qr.addData(url); qr.make();
-    document.querySelector("#stripQrImg").src=qr.createDataURL(6,12);
+    const img=document.querySelector("#stripQrImg"); img.src=qr.createDataURL(6,12); img.style.display="";
+    const cap=document.querySelector("#stripQrCap"); if(cap) cap.textContent="📱 Scan to get your photos on your phone";
+    const sub=document.querySelector("#stripQrSub"); if(sub) sub.style.display="";
     document.querySelector("#stripQr").style.display="";
   }catch{}
+}
+/* Show the QR box immediately (before the upload finishes) so guests always see
+   it coming; showStripQr() then fills in the real code a couple seconds later. */
+function showStripQrLoading(){
+  const box=document.querySelector("#stripQr"); if(!box) return;
+  const img=document.querySelector("#stripQrImg"); if(img) img.style.display="none";
+  const cap=document.querySelector("#stripQrCap"); if(cap) cap.textContent="📱 Preparing your download QR…";
+  const sub=document.querySelector("#stripQrSub"); if(sub) sub.style.display="none";
+  box.style.display="";
 }
 function hideStripQr(){ const el=document.querySelector("#stripQr"); if(el) el.style.display="none"; }
 
 function setUploadStatus(s,id,byKind,targets){
   const el=els.uploadStatus, rb=els.retryUpload; if(!el) return; if(rb) rb.style.display="none";
-  if(s==="uploading"){ el.textContent="💾 Saving session…"; el.style.color="var(--muted)"; hideStripQr(); return; }
+  if(s==="uploading"){ el.textContent="💾 Saving session…"; el.style.color="var(--muted)"; showStripQrLoading(); return; }
   if(s==="failed"){ el.textContent="⚠ Upload failed — your download & gallery copy still work."; el.style.color="var(--warn)"; if(rb) rb.style.display=""; hideStripQr(); return; }
   if(s==="saved"){
     if(byKind && (byKind.cloud||byKind.local)){
@@ -1049,7 +1064,7 @@ function composeStrip(shots, themeId, scale){
   });
   const F=T.footer||{};
   ctx.textAlign="center";
-  if(T.id==="wedding"){
+  if(F.heart){
     // split rule with a small heart at center
     ctx.fillStyle=T.accent;
     ctx.fillRect(SIDE, footerY+12, frameW/2-18, 3);
@@ -1108,7 +1123,7 @@ function downloadURL(url,filename){ const a=document.createElement("a"); a.href=
 function buildShotDots(n){ els.shotDots.innerHTML=""; for(let i=0;i<n;i++){ const d=document.createElement("div"); d.className="dot"; els.shotDots.appendChild(d); } els.shotDots.classList.remove("hidden"); }
 function markShotDone(i){ const d=els.shotDots.children[i]; if(d) d.classList.add("done"); }
 function setControlsEnabled(on){ els.startBtn.disabled=!on||!state.stream; els.switchCam.disabled=!on; els.mirrorBtn.disabled=!on; els.bgToggle.disabled=!on; els.countSeg.querySelectorAll("button").forEach(b=>b.disabled=!on); setPropSegEnabled(on); }
-function showResult(url){ els.stripPreview.src=url; els.result.classList.add("show"); }
+function showResult(url){ els.stripPreview.src=url; els.result.classList.add("show"); clearTimeout(state.resultTimer); state.resultTimer=setTimeout(()=>{ if(els.result.classList.contains("show")) hideResult(); }, 20000); }
 function setBoomResultUI(boom){
   const v=document.querySelector("#boomVid"), b=document.querySelector("#boomSave");
   if(boom && boom.blob){ v.src=URL.createObjectURL(boom.blob); v.style.display=""; b.style.display=""; }
@@ -1126,7 +1141,7 @@ async function saveBoomerang(){
   }catch(e){ if(e && e.name==="AbortError") return; }
   const u=URL.createObjectURL(boom.blob); downloadURL(u, name); setTimeout(()=>URL.revokeObjectURL(u), 5000);
 }
-function hideResult(){ els.result.classList.remove("show"); }
+function hideResult(){ clearTimeout(state.resultTimer); els.result.classList.remove("show"); }
 function applyMirror(){ els.mirrorBtn.textContent="Mirror: "+(state.mirror?"On":"Off"); }
 function setStripTheme(id){ if(!STRIP_THEMES.some(t=>t.id===id)) return; state.stripTheme=id; if(els.themeSel) els.themeSel.value=id; }
 function setShots(n){ if(n!==3&&n!==4) return; state.numPhotos=n; els.countSeg.querySelectorAll("button").forEach(x=>x.classList.toggle("active", x.dataset.n===String(n))); }
