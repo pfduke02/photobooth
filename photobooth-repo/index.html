@@ -1111,7 +1111,12 @@ function dateLabel(){ try { return new Date().toLocaleDateString(undefined,{year
 
 /* ---------- 7) gallery + storage ------------------------------------------ */
 const STORE_KEY="photobooth.v0.strips"; let memGallery=[];
-const store={ read(){ try { return JSON.parse(localStorage.getItem(STORE_KEY)||"[]"); } catch { return memGallery; } }, write(list){ memGallery=list; try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); } catch {} } };
+try { memGallery = JSON.parse(localStorage.getItem(STORE_KEY)||"[]"); } catch { memGallery=[]; }
+/* In-memory list is the source of truth for the session's strips; localStorage is
+   best-effort persistence. Big strips can exceed the ~5MB quota — before, a failed
+   write left reads pinned to the last-saved copy, so only the FIRST strip showed.
+   Now every strip stays in memory and shows, even when the write can't persist. */
+const store={ read(){ return memGallery; }, write(list){ memGallery=list; try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); } catch {} } };
 function saveToGallery(url){ const list=store.read(); list.unshift({url,t:Date.now()}); while(list.length>CONFIG.galleryMax) list.pop(); store.write(list); renderGallery(); }
 function renderGallery(){
   const list=store.read(); els.clearGallery.style.display=list.length?"":"none";
