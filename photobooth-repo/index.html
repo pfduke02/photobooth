@@ -28,6 +28,9 @@
 
   header { display:none; }   /* simplified: hide the title + subtitle */
   #stage { position:relative; background:#000; border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow); aspect-ratio:4/3; max-height:74vh; display:flex; align-items:center; justify-content:center; }
+  /* Immersive capture: once a session starts, the camera fills the whole screen and the rest of the UI hides. */
+  body.capturing #stage { position:fixed; inset:0; max-height:none; border-radius:0; aspect-ratio:auto; z-index:10; }
+  body.capturing #controls, body.capturing #utilRow, body.capturing #galleryPanel { display:none !important; }
   #video { position:absolute; width:2px; height:2px; opacity:0; pointer-events:none; }
   #proc { width:100%; height:100%; object-fit:cover; display:block; background:#000; }
   #countdown { position:absolute; inset:0; display:none; align-items:center; justify-content:center; font-size:clamp(90px,22vw,240px); font-weight:800; color:#fff; text-shadow:0 6px 40px rgba(0,0,0,.6); pointer-events:none; }
@@ -707,7 +710,7 @@ function sfx(kind){
 }
 async function runSession(){
   if(state.busy || !state.stream) return;
-  state.busy=true; setControlsEnabled(false); window.__PB.done=false; window.__PB.count=0;
+  state.busy=true; setControlsEnabled(false); document.body.classList.add("capturing"); window.__PB.done=false; window.__PB.count=0;
   window.__PB.upload=null;   // stale status from the previous session must not leak into this one
   state.restyleChoice="none"; state.restyleMs=null; checkRestyle();   // refresh sidecar availability per session
   hideStripQr();
@@ -734,7 +737,7 @@ async function runSession(){
     const boomDataUrl = boom ? await blobToDataURL(boom.blob) : null;
     uploadSession(buildSession(shots, url, boomDataUrl));   // COLLECTION: background upload — never blocks capture
   }
-  state.busy=false; setControlsEnabled(true);
+  state.busy=false; setControlsEnabled(true); document.body.classList.remove("capturing");
 }
 async function countdown(seconds){
   for(let n=seconds;n>=1;n--){ els.countdown.textContent=n; els.countdown.classList.remove("show"); void els.countdown.offsetWidth; els.countdown.classList.add("show"); sfx("beep"); await sleep(TICK_MS); }
@@ -1141,7 +1144,7 @@ async function saveBoomerang(){
   }catch(e){ if(e && e.name==="AbortError") return; }
   const u=URL.createObjectURL(boom.blob); downloadURL(u, name); setTimeout(()=>URL.revokeObjectURL(u), 5000);
 }
-function hideResult(){ clearTimeout(state.resultTimer); els.result.classList.remove("show"); }
+function hideResult(){ clearTimeout(state.resultTimer); els.result.classList.remove("show"); document.body.classList.remove("capturing"); }
 function applyMirror(){ els.mirrorBtn.textContent="Mirror: "+(state.mirror?"On":"Off"); }
 function setStripTheme(id){ if(!STRIP_THEMES.some(t=>t.id===id)) return; state.stripTheme=id; if(els.themeSel) els.themeSel.value=id; }
 function setShots(n){ if(n!==3&&n!==4) return; state.numPhotos=n; els.countSeg.querySelectorAll("button").forEach(x=>x.classList.toggle("active", x.dataset.n===String(n))); }
