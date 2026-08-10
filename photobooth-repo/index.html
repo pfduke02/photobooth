@@ -130,7 +130,7 @@
   #resultCard { background:var(--panel); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); max-width:92vw; max-height:92vh; display:flex; gap:22px; align-items:center; }
   @media (max-width:700px){ #resultCard{ flex-direction:column; } }
   #stripPreview { max-height:74vh; border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,.5); }
-  #resultActions { display:flex; flex-direction:column; gap:12px; min-width:220px; }
+  #resultActions { display:flex; flex-direction:column; gap:12px; min-width:250px; }
   #resultActions h3 { margin:0 0 4px; font-size:18px; }
   #resultActions p { margin:0 0 8px; color:var(--muted); font-size:13px; }
   #resultActions .ustat { min-height:18px; margin:0 0 4px; font-size:13px; }
@@ -139,7 +139,7 @@
   @keyframes pop2 { 0%{transform:scale(.85);opacity:0;} 100%{transform:scale(1);opacity:1;} }
   #resultCTAs { display:flex; gap:12px; }
   #resultCTAs .btn { flex:1; justify-content:center; }
-  .btn.big { font-size:19px; padding:18px 20px; }
+  .btn.big { font-size:22px; padding:22px 18px; font-weight:800; }
 </style>
 </head>
 <body>
@@ -244,6 +244,8 @@
 
   <div id="result">
     <div id="resultCard">
+      <!-- Boomerang preview sits left of the strip, vertically centered (loops on its own). -->
+      <video id="boomVid" loop muted playsinline autoplay style="display:none; width:min(34vw,300px); align-self:center; border-radius:12px; border:1px solid #303445;"></video>
       <img id="stripPreview" alt="Photo strip" />
       <div id="resultActions">
         <div id="resultCTAs">
@@ -251,18 +253,16 @@
           <button class="btn primary big" id="againBtn">↺ Redo</button>
         </div>
         <p id="uploadStatus" class="ustat"></p>
-        <div id="stripQr" style="display:none; text-align:center; background:#fff; border-radius:12px; padding:12px; margin:2px 0 8px;">
-          <img id="stripQrImg" alt="QR code for this strip" style="width:158px; height:158px; image-rendering:pixelated; display:block; margin:0 auto;" />
-          <div id="stripQrCap" style="font:700 13px var(--font); color:#222; margin-top:7px;">📱 Scan to get your photos on your phone</div>
-          <div id="stripQrSub" style="font:500 10.5px var(--font); color:#666; margin-top:3px;">press &amp; hold the photo → “Save to Photos”</div>
+        <div id="stripQr" style="display:none; text-align:center; background:#fff; border-radius:14px; padding:14px; margin:2px 0 8px;">
+          <img id="stripQrImg" alt="QR code for this strip" style="width:210px; height:210px; image-rendering:pixelated; display:block; margin:0 auto;" />
+          <div id="stripQrCap" style="font:700 14px var(--font); color:#222; margin-top:8px;">📱 Scan to get your photos on your phone</div>
+          <div id="stripQrSub" style="font:500 11px var(--font); color:#666; margin-top:3px;">press &amp; hold the photo → “Save to Photos”</div>
         </div>
         <!-- Strip already saves automatically (cloud + gallery); this shares the
              local photo file, so it's deliberately small/unhighlighted. -->
         <button class="btn ghost" id="downloadBtn" style="font-size:13px; padding:9px 14px;">📤 Share photo</button>
         <button class="btn ghost" id="retryUpload" style="display:none">↻ Retry upload</button>
-        <button class="btn" id="closeResult" style="display:none">✕ Close</button>
-        <video id="boomVid" loop muted playsinline autoplay style="display:none; width:100%; max-width:240px; border-radius:10px; border:1px solid #303445;"></video>
-        <button class="btn" id="boomSave" style="display:none">🌀 Save boomerang</button>
+        <button class="btn big" id="closeResult" style="display:none">✕ Close</button>
       </div>
     </div>
   </div>
@@ -1177,9 +1177,9 @@ function markShotDone(i){ const d=els.shotDots.children[i]; if(d) d.classList.ad
 function setControlsEnabled(on){ els.startBtn.disabled=!on||!state.stream; els.switchCam.disabled=!on; els.mirrorBtn.disabled=!on; els.bgToggle.disabled=!on; els.countSeg.querySelectorAll("button").forEach(b=>b.disabled=!on); setPropSegEnabled(on); }
 function showResult(url){ els.stripPreview.src=url; if(els.closeResult) els.closeResult.style.display="none"; els.result.classList.add("show"); clearTimeout(state.resultTimer); state.resultTimer=setTimeout(()=>{ if(els.result.classList.contains("show")) hideResult(); }, 45000); clearTimeout(state.closeRevealTimer); state.closeRevealTimer=setTimeout(()=>{ if(els.closeResult) els.closeResult.style.display=""; }, 8000); }
 function setBoomResultUI(boom){
-  const v=document.querySelector("#boomVid"), b=document.querySelector("#boomSave");
-  if(boom && boom.blob){ v.src=URL.createObjectURL(boom.blob); v.style.display=""; b.style.display=""; }
-  else { v.removeAttribute("src"); v.style.display="none"; b.style.display="none"; }
+  const v=document.querySelector("#boomVid"); if(!v) return;
+  if(boom && boom.blob){ v.src=URL.createObjectURL(boom.blob); v.style.display=""; }
+  else { v.removeAttribute("src"); v.style.display="none"; }
 }
 async function saveBoomerang(){
   const boom=state.lastBoomerang; if(!boom) return;
@@ -1210,7 +1210,6 @@ els.bgUrl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") useBgUrl(); });
 els.countSeg.addEventListener("click", (e)=>{ const b=e.target.closest("button[data-n]"); if(!b) return; state.numPhotos=parseInt(b.dataset.n,10); els.countSeg.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b)); });
 els.downloadBtn.addEventListener("click", saveStrip);
 els.printBtn.addEventListener("click", enqueuePrint);
-document.querySelector("#boomSave").addEventListener("click", saveBoomerang);
 /* On phones/tablets, "save" opens the native share sheet (Save to Photos,
    AirDrop, Messages…) via the Web Share API; on desktop it downloads. */
 async function saveStrip(){
