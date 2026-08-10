@@ -1197,7 +1197,7 @@ els.bgUrlBtn.addEventListener("click", useBgUrl);
 els.bgUrl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") useBgUrl(); });
 els.countSeg.addEventListener("click", (e)=>{ const b=e.target.closest("button[data-n]"); if(!b) return; state.numPhotos=parseInt(b.dataset.n,10); els.countSeg.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b)); });
 els.downloadBtn.addEventListener("click", saveStrip);
-els.printBtn.addEventListener("click", savePrintSheet);
+els.printBtn.addEventListener("click", enqueuePrint);
 document.querySelector("#boomSave").addEventListener("click", saveBoomerang);
 /* On phones/tablets, "save" opens the native share sheet (Save to Photos,
    AirDrop, Messages…) via the Web Share API; on desktop it downloads. */
@@ -1233,6 +1233,30 @@ async function savePrintSheet(){
     downloadURL(url, name);
   }catch(e){ if(e && e.name==="AbortError") return; showToast("Couldn't build the print sheet — try again."); }
   finally{ if(btn){ btn.disabled=false; btn.textContent=orig; } }
+}
+/* One-tap print: compose the 4×6 sheet and drop it in the cloud print queue.
+   The Mac print server at the event picks it up and prints to the Selphy — no
+   share sheet, no printer dialog. Just a confirmation toast. */
+async function enqueuePrint(){
+  if(!state.lastStripURL) return;
+  const btn=els.printBtn, orig=btn?btn.textContent:"";
+  if(btn){ btn.disabled=true; btn.textContent="🖨 Sending…"; }
+  try{
+    const image=await composePrintSheet(state.lastStripURL);
+    const C=CONFIG.collection.cloud;
+    const endpoint=C.endpoint.replace(/\/[^/]+$/, "/print");
+    const res=await fetch(endpoint,{ method:"POST",
+      headers:{ "Content-Type":"application/json", "apikey":C.anonKey, "Authorization":"Bearer "+C.anonKey, "x-booth-key":C.boothKey },
+      body:JSON.stringify({ image }) });
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const data=await res.json(); if(!data.ok) throw new Error(data.error||"server error");
+    if(btn){ btn.textContent="✓ Sent to printer"; }
+    showToast("🖨 Sent to the printer!");
+    setTimeout(()=>{ if(btn){ btn.disabled=false; btn.textContent=orig; } }, 2500);
+  }catch(e){
+    if(btn){ btn.disabled=false; btn.textContent=orig; }
+    showToast("Couldn't reach the printer — is the Mac print server running?");
+  }
 }
 /* Direct AirPrint path: build the 4×6, drop it into a hidden iframe sized to the
    4×6 page with zero margin, and fire the OS print dialog (Safari → AirPrint →
