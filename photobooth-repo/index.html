@@ -27,7 +27,7 @@
   @media (max-width:880px){ main{ grid-template-columns:1fr; } #galleryPanel{ order:3; } }
 
   header { display:none; }   /* simplified: hide the title + subtitle */
-  #stage { position:relative; background:#000; border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow); aspect-ratio:4/3; max-height:74vh; display:flex; align-items:center; justify-content:center; }
+  #stage { position:fixed; inset:0; background:#000; overflow:hidden; display:flex; align-items:center; justify-content:center; z-index:1; }   /* immersive: camera fills the screen at idle + capture */
   /* Immersive capture: once a session starts, the camera fills the whole screen and the rest of the UI hides. */
   body.capturing #stage { position:fixed; inset:0; max-height:none; border-radius:0; aspect-ratio:auto; z-index:10; }
   body.capturing #controls, body.capturing #utilRow, body.capturing #galleryPanel { display:none !important; }
@@ -134,6 +134,12 @@
   #resultActions h3 { margin:0 0 4px; font-size:18px; }
   #resultActions p { margin:0 0 8px; color:var(--muted); font-size:13px; }
   #resultActions .ustat { min-height:18px; margin:0 0 4px; font-size:13px; }
+  #getReady { position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:7vw; font-size:clamp(26px,5.5vw,58px); font-weight:800; line-height:1.18; color:#fff; text-shadow:0 6px 40px rgba(0,0,0,.7); background:rgba(0,0,0,.42); z-index:6; }
+  #getReady.show { display:flex; animation:pop2 .5s ease-out; }
+  @keyframes pop2 { 0%{transform:scale(.85);opacity:0;} 100%{transform:scale(1);opacity:1;} }
+  #resultCTAs { display:flex; gap:12px; }
+  #resultCTAs .btn { flex:1; justify-content:center; }
+  .btn.big { font-size:19px; padding:18px 20px; }
 </style>
 </head>
 <body>
@@ -150,6 +156,7 @@
         <div id="aiBadge">✨ background</div>
         <div id="shotDots" class="hidden"></div>
         <div id="countdown"></div>
+        <div id="getReady"></div>
         <div id="prompt">Smile! 📸</div>
         <div id="flash"></div>
         <button class="btn primary" id="startBtn" disabled>📸 Start</button>
@@ -239,22 +246,23 @@
     <div id="resultCard">
       <img id="stripPreview" alt="Photo strip" />
       <div id="resultActions">
-        <h3>Nice strip! ✨</h3>
+        <div id="resultCTAs">
+          <button class="btn primary big" id="printBtn">🖨 Print</button>
+          <button class="btn primary big" id="againBtn">↺ Redo</button>
+        </div>
         <p id="uploadStatus" class="ustat"></p>
         <div id="stripQr" style="display:none; text-align:center; background:#fff; border-radius:12px; padding:12px; margin:2px 0 8px;">
           <img id="stripQrImg" alt="QR code for this strip" style="width:158px; height:158px; image-rendering:pixelated; display:block; margin:0 auto;" />
           <div id="stripQrCap" style="font:700 13px var(--font); color:#222; margin-top:7px;">📱 Scan to get your photos on your phone</div>
           <div id="stripQrSub" style="font:500 10.5px var(--font); color:#666; margin-top:3px;">press &amp; hold the photo → “Save to Photos”</div>
         </div>
-        <video id="boomVid" loop muted playsinline autoplay style="display:none; width:100%; max-width:240px; border-radius:10px; border:1px solid #303445;"></video>
-        <button class="btn primary" id="printBtn">🖨 Print</button>
-        <button class="btn primary" id="againBtn">↺ Take another</button>
-        <button class="btn" id="boomSave" style="display:none">🌀 Save boomerang</button>
-        <!-- Strip already saves automatically (cloud + gallery) — this is just a
-             local-file copy, so it's deliberately small/unhighlighted. -->
-        <button class="btn ghost" id="downloadBtn" style="font-size:13px; padding:9px 14px;">⬇ Download to this device</button>
+        <!-- Strip already saves automatically (cloud + gallery); this shares the
+             local photo file, so it's deliberately small/unhighlighted. -->
+        <button class="btn ghost" id="downloadBtn" style="font-size:13px; padding:9px 14px;">📤 Share photo</button>
         <button class="btn ghost" id="retryUpload" style="display:none">↻ Retry upload</button>
-        <button class="btn ghost" id="closeResult">Close</button>
+        <button class="btn" id="closeResult" style="display:none">✕ Close</button>
+        <video id="boomVid" loop muted playsinline autoplay style="display:none; width:100%; max-width:240px; border-radius:10px; border:1px solid #303445;"></video>
+        <button class="btn" id="boomSave" style="display:none">🌀 Save boomerang</button>
       </div>
     </div>
   </div>
@@ -305,7 +313,7 @@ const CONFIG = {
   // After the last shot: review thumbnails, tap one to redo it. Auto-continues
   // after reviewSeconds so a guest who walks away still gets their strip
   // (and exactly ONE upload per session — retakes happen BEFORE compose/upload).
-  retake:{ enabled:true, reviewSeconds:5 },
+  retake:{ enabled:false, reviewSeconds:5 },   // guests: no review/retake — straight to the strip
   // 🌀 Boomerang: after the last shot, capture a short "move!" clip and encode
   // a looping ping-pong video (MediaRecorder). Saved/shared alongside the strip
   // and uploaded with the session. Encoding happens DURING the review wait.
@@ -387,7 +395,7 @@ else CONFIG.collection.target = IS_LOCAL_HOST ? "both" : "cloud";
 const $ = (s)=>document.querySelector(s);
 const els = {
   video:$("#video"), proc:$("#proc"), stage:$("#stage"),
-  countdown:$("#countdown"), prompt:$("#prompt"), flash:$("#flash"),
+  countdown:$("#countdown"), getReady:$("#getReady"), prompt:$("#prompt"), flash:$("#flash"),
   shotDots:$("#shotDots"), aiBadge:$("#aiBadge"),
   startBtn:$("#startBtn"), switchCam:$("#switchCam"), bgToggle:$("#bgToggle"),
   mirrorBtn:$("#mirrorBtn"), countSeg:$("#countSeg"), collState:$("#collState"), themeSel:$("#themeSel"),
@@ -717,6 +725,9 @@ async function runSession(){
   state.restyleChoice="none"; state.restyleMs=null; checkRestyle();   // refresh sidecar availability per session
   hideStripQr();
   const shots=[]; buildShotDots(state.numPhotos); state.propShots=[];
+  els.getReady.textContent="📸 Get ready for your "+state.numPhotos+" moments of fame!";
+  els.getReady.classList.add("show"); sfx("go"); await sleep(FAST?150:2400);
+  els.getReady.classList.remove("show");
   for(let i=0;i<state.numPhotos;i++){
     if(state.prop==="surprise") rollProp();            // 🎲 new prop each shot — guests see it live
     await countdown(CONFIG.countdownSeconds); await flashAndGrab(shots);
@@ -986,6 +997,7 @@ function showStripQr(url){
     const cap=document.querySelector("#stripQrCap"); if(cap) cap.textContent="📱 Scan to get your photos on your phone";
     const sub=document.querySelector("#stripQrSub"); if(sub) sub.style.display="";
     document.querySelector("#stripQr").style.display="";
+    if(els.closeResult) els.closeResult.style.display="";   // Close appears below the QR once it fills in
   }catch{}
 }
 /* Show the QR box immediately (before the upload finishes) so guests always see
@@ -1002,7 +1014,7 @@ function hideStripQr(){ const el=document.querySelector("#stripQr"); if(el) el.s
 function setUploadStatus(s,id,byKind,targets){
   const el=els.uploadStatus, rb=els.retryUpload; if(!el) return; if(rb) rb.style.display="none";
   if(s==="uploading"){ el.textContent="💾 Saving session…"; el.style.color="var(--muted)"; showStripQrLoading(); return; }
-  if(s==="failed"){ el.textContent="⚠ Upload failed — your download & gallery copy still work."; el.style.color="var(--warn)"; if(rb) rb.style.display=""; hideStripQr(); return; }
+  if(s==="failed"){ el.textContent="⚠ Upload failed — your download & gallery copy still work."; el.style.color="var(--warn)"; if(rb) rb.style.display=""; hideStripQr(); if(els.closeResult) els.closeResult.style.display=""; return; }
   if(s==="saved"){
     if(byKind && (byKind.cloud||byKind.local)){
       const bits=[];
@@ -1163,7 +1175,7 @@ function downloadURL(url,filename){ const a=document.createElement("a"); a.href=
 function buildShotDots(n){ els.shotDots.innerHTML=""; for(let i=0;i<n;i++){ const d=document.createElement("div"); d.className="dot"; els.shotDots.appendChild(d); } els.shotDots.classList.remove("hidden"); }
 function markShotDone(i){ const d=els.shotDots.children[i]; if(d) d.classList.add("done"); }
 function setControlsEnabled(on){ els.startBtn.disabled=!on||!state.stream; els.switchCam.disabled=!on; els.mirrorBtn.disabled=!on; els.bgToggle.disabled=!on; els.countSeg.querySelectorAll("button").forEach(b=>b.disabled=!on); setPropSegEnabled(on); }
-function showResult(url){ els.stripPreview.src=url; els.result.classList.add("show"); clearTimeout(state.resultTimer); state.resultTimer=setTimeout(()=>{ if(els.result.classList.contains("show")) hideResult(); }, 20000); }
+function showResult(url){ els.stripPreview.src=url; if(els.closeResult) els.closeResult.style.display="none"; els.result.classList.add("show"); clearTimeout(state.resultTimer); state.resultTimer=setTimeout(()=>{ if(els.result.classList.contains("show")) hideResult(); }, 45000); clearTimeout(state.closeRevealTimer); state.closeRevealTimer=setTimeout(()=>{ if(els.closeResult) els.closeResult.style.display=""; }, 8000); }
 function setBoomResultUI(boom){
   const v=document.querySelector("#boomVid"), b=document.querySelector("#boomSave");
   if(boom && boom.blob){ v.src=URL.createObjectURL(boom.blob); v.style.display=""; b.style.display=""; }
@@ -1318,7 +1330,7 @@ document.addEventListener("keydown", (e)=>{
 
 /* ---------- boot ---------------------------------------------------------- */
 els.brandTitle.textContent=CONFIG.brandTitle; document.title=CONFIG.brandTitle+" · V"+CONFIG.appVersion;
-if(matchMedia("(pointer:coarse)").matches) els.downloadBtn.textContent="📤 Share / save strip";   // touch → share sheet
+if(matchMedia("(pointer:coarse)").matches) els.downloadBtn.textContent="📤 Share photo";   // touch → share sheet
 applyMirror(); if(els.themeSel) els.themeSel.value=state.stripTheme; renderGallery(); preloadBackgrounds(); checkCollection(); checkRestyle(); startCamera();
 </script>
 </body>
