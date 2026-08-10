@@ -247,8 +247,7 @@
           <div id="stripQrSub" style="font:500 10.5px var(--font); color:#666; margin-top:3px;">press &amp; hold the photo → “Save to Photos”</div>
         </div>
         <video id="boomVid" loop muted playsinline autoplay style="display:none; width:100%; max-width:240px; border-radius:10px; border:1px solid #303445;"></video>
-        <button class="btn primary" id="printBtn">🖨 Print strip</button>
-        <button class="btn" id="sheetShareBtn" style="font-size:13px; padding:9px 14px;">📤 Save / send to SELPHY app</button>
+        <button class="btn primary" id="printBtn">🖨 Print</button>
         <button class="btn primary" id="againBtn">↺ Take another</button>
         <button class="btn" id="boomSave" style="display:none">🌀 Save boomerang</button>
         <!-- Strip already saves automatically (cloud + gallery) — this is just a
@@ -283,7 +282,7 @@
 /* ---------- 1) CONFIG ------------------------------------------------------ */
 const CONFIG = {
   brandTitle:"Photobooth", brandSubtitle:"", stripFooter:"PHOTOBOOTH",
-  numPhotos:3, countdownSeconds:3, betweenShotsMs:900,
+  numPhotos:4, countdownSeconds:3, betweenShotsMs:900,
   mirror:true, exportScale:2, frameAspect:4/3, printCutLine:true,
   ai:{ modelSelection:1, featherPx:2, blurPx:16, defaultBg:"blur" },
   // COLLECTION: after each session, POST {strip, frames[], meta} to an endpoint.
@@ -397,7 +396,7 @@ const els = {
   review:$("#review"), rvThumbs:$("#rvThumbs"), rvOk:$("#rvOk"),
   gallery:$("#gallery"), clearGallery:$("#clearGallery"),
   result:$("#result"), stripPreview:$("#stripPreview"), uploadStatus:$("#uploadStatus"),
-  downloadBtn:$("#downloadBtn"), printBtn:$("#printBtn"), sheetShareBtn:$("#sheetShareBtn"), againBtn:$("#againBtn"), retryUpload:$("#retryUpload"), closeResult:$("#closeResult"),
+  downloadBtn:$("#downloadBtn"), printBtn:$("#printBtn"), againBtn:$("#againBtn"), retryUpload:$("#retryUpload"), closeResult:$("#closeResult"),
   brandTitle:$("#brandTitle"),
 };
 const procCtx = els.proc.getContext("2d");
@@ -1081,10 +1080,10 @@ function composeStrip(shots, themeId, scale){
     ctx.fillStyle=T.accent; ctx.fillRect(SIDE, footerY+12, frameW, 3);
   }
   const l1=(F.l1!=null)?F.l1:(CONFIG.stripFooter||"");
-  ctx.fillStyle=T.text; ctx.font=(F.serif?"italic 700 30px "+serifStack():"700 27px "+fontStack());
-  ctx.fillText(F.upper===false?l1:l1.toUpperCase(), stripW/2, footerY+(F.serif?60:58));
-  ctx.fillStyle=T.sub; ctx.font=(F.serif?"500 15px "+serifStack():"500 14px "+fontStack());
-  ctx.fillText((F.l2!=null)?F.l2:(CONFIG.brandSubtitle||dateLabel()), stripW/2, footerY+86);
+  ctx.fillStyle=T.text; ctx.font=(F.serif?"italic 700 44px "+serifStack():"700 40px "+fontStack());
+  ctx.fillText(F.upper===false?l1:l1.toUpperCase(), stripW/2, footerY+(F.serif?64:62));
+  ctx.fillStyle=T.sub; ctx.font=(F.serif?"500 26px "+serifStack():"500 24px "+fontStack());
+  ctx.fillText((F.l2!=null)?F.l2:(CONFIG.brandSubtitle||dateLabel()), stripW/2, footerY+102);
   try { return c.toDataURL("image/png"); }
   catch(e){ showToast("Export blocked — a cross-origin background tainted the canvas. Upload the image instead of using its URL."); return null; }
 }
@@ -1194,8 +1193,7 @@ els.bgUrlBtn.addEventListener("click", useBgUrl);
 els.bgUrl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") useBgUrl(); });
 els.countSeg.addEventListener("click", (e)=>{ const b=e.target.closest("button[data-n]"); if(!b) return; state.numPhotos=parseInt(b.dataset.n,10); els.countSeg.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b)); });
 els.downloadBtn.addEventListener("click", saveStrip);
-els.printBtn.addEventListener("click", airPrintSheet);
-els.sheetShareBtn.addEventListener("click", savePrintSheet);
+els.printBtn.addEventListener("click", savePrintSheet);
 document.querySelector("#boomSave").addEventListener("click", saveBoomerang);
 /* On phones/tablets, "save" opens the native share sheet (Save to Photos,
    AirDrop, Messages…) via the Web Share API; on desktop it downloads. */
@@ -1217,8 +1215,8 @@ function printFilename(){ const d=new Date(), p=(x)=>String(x).padStart(2,"0"); 
    sheet → Canon SELPHY app, or Save to Photos) or download (desktop). */
 async function savePrintSheet(){
   if(!state.lastStripURL) return;
-  const btn=els.sheetShareBtn, orig=btn?btn.textContent:"";
-  if(btn){ btn.disabled=true; btn.textContent="📤 Preparing…"; }
+  const btn=els.printBtn, orig=btn?btn.textContent:"";
+  if(btn){ btn.disabled=true; btn.textContent="🖨 Preparing…"; }
   try{
     const url=await composePrintSheet(state.lastStripURL);
     const name=printFilename();
