@@ -134,12 +134,14 @@
   #resultActions h3 { margin:0 0 4px; font-size:18px; }
   #resultActions p { margin:0 0 8px; color:var(--muted); font-size:13px; }
   #resultActions .ustat { min-height:18px; margin:0 0 4px; font-size:13px; }
-  #getReady { position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:7vw; font-size:clamp(26px,5.5vw,58px); font-weight:800; line-height:1.18; color:#fff; text-shadow:0 6px 40px rgba(0,0,0,.7); background:rgba(0,0,0,.42); z-index:6; }
+  #getReady { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:6vw; line-height:1.06; color:#fff; text-shadow:0 6px 40px rgba(0,0,0,.7); background:rgba(0,0,0,.42); z-index:6; }
+  #getReady .gr-big { font-weight:900; font-size:clamp(46px,11.5vw,124px); letter-spacing:.02em; }
+  #getReady .gr-sub { font-weight:700; font-size:clamp(21px,4.6vw,44px); margin-top:.16em; opacity:.97; }
   #getReady.show { display:flex; animation:pop2 .5s ease-out; }
   @keyframes pop2 { 0%{transform:scale(.85);opacity:0;} 100%{transform:scale(1);opacity:1;} }
-  #resultCTAs { display:flex; gap:12px; }
-  #resultCTAs .btn { flex:1; justify-content:center; }
-  .btn.big { font-size:22px; padding:22px 18px; font-weight:800; }
+  #resultCTAs { display:flex; flex-direction:column; gap:12px; }
+  #resultCTAs .btn { width:100%; justify-content:center; }
+  .btn.big { font-size:26px; padding:26px 20px; font-weight:800; border-radius:16px; box-shadow:0 6px 20px rgba(0,0,0,.28); }
 </style>
 </head>
 <body>
@@ -317,7 +319,7 @@ const CONFIG = {
   // 🌀 Boomerang: after the last shot, capture a short "move!" clip and encode
   // a looping ping-pong video (MediaRecorder). Saved/shared alongside the strip
   // and uploaded with the session. Encoding happens DURING the review wait.
-  boomerang:{ enabled:true, seconds:1.4, fps:20, playbackFps:24 },
+  boomerang:{ enabled:false, seconds:1.4, fps:20, playbackFps:24 },   // set true to bring back the left-of-strip boomerang video
   // 🪄 Phase 2A — face props (crown/top hat/sunglasses) via MediaPipe
   // FaceLandmarker. The model can't be vendored (build-sandbox egress), so it
   // loads AT RUNTIME from Google's CDN the first time a guest picks a prop —
@@ -725,7 +727,7 @@ async function runSession(){
   state.restyleChoice="none"; state.restyleMs=null; checkRestyle();   // refresh sidecar availability per session
   hideStripQr();
   const shots=[]; buildShotDots(state.numPhotos); state.propShots=[];
-  els.getReady.textContent="📸 Get ready for your "+state.numPhotos+" moments of fame!";
+  els.getReady.innerHTML='<span class="gr-big">GET READY</span><span class="gr-sub">for your '+state.numPhotos+' moments of fame! 📸</span>';
   els.getReady.classList.add("show"); sfx("go"); await sleep(FAST?150:2400);
   els.getReady.classList.remove("show");
   for(let i=0;i<state.numPhotos;i++){
@@ -993,9 +995,9 @@ function showStripQr(url){
   try{
     if(typeof qrcode==="undefined"||!url) return;
     const qr=qrcode(0,"M"); qr.addData(url); qr.make();
-    const img=document.querySelector("#stripQrImg"); img.src=qr.createDataURL(6,12); img.style.display="";
+    const img=document.querySelector("#stripQrImg"); img.src=qr.createDataURL(6,12); img.style.display=""; img.style.background="";
     const cap=document.querySelector("#stripQrCap"); if(cap) cap.textContent="📱 Scan to get your photos on your phone";
-    const sub=document.querySelector("#stripQrSub"); if(sub) sub.style.display="";
+    const sub=document.querySelector("#stripQrSub"); if(sub) sub.style.visibility="";
     document.querySelector("#stripQr").style.display="";
     if(els.closeResult) els.closeResult.style.display="";   // Close appears below the QR once it fills in
   }catch{}
@@ -1004,9 +1006,12 @@ function showStripQr(url){
    it coming; showStripQr() then fills in the real code a couple seconds later. */
 function showStripQrLoading(){
   const box=document.querySelector("#stripQr"); if(!box) return;
-  const img=document.querySelector("#stripQrImg"); if(img) img.style.display="none";
+  // Keep the 210×210 tile occupied with a neutral placeholder so nothing below
+  // shifts when the real QR swaps in a couple seconds later.
+  const img=document.querySelector("#stripQrImg");
+  if(img){ img.src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="; img.style.display=""; img.style.background="#eef0f4"; }
   const cap=document.querySelector("#stripQrCap"); if(cap) cap.textContent="📱 Preparing your download QR…";
-  const sub=document.querySelector("#stripQrSub"); if(sub) sub.style.display="none";
+  const sub=document.querySelector("#stripQrSub"); if(sub) sub.style.visibility="hidden";   // reserve its line, don't collapse it
   box.style.display="";
 }
 function hideStripQr(){ const el=document.querySelector("#stripQr"); if(el) el.style.display="none"; }
@@ -1175,7 +1180,7 @@ function downloadURL(url,filename){ const a=document.createElement("a"); a.href=
 function buildShotDots(n){ els.shotDots.innerHTML=""; for(let i=0;i<n;i++){ const d=document.createElement("div"); d.className="dot"; els.shotDots.appendChild(d); } els.shotDots.classList.remove("hidden"); }
 function markShotDone(i){ const d=els.shotDots.children[i]; if(d) d.classList.add("done"); }
 function setControlsEnabled(on){ els.startBtn.disabled=!on||!state.stream; els.switchCam.disabled=!on; els.mirrorBtn.disabled=!on; els.bgToggle.disabled=!on; els.countSeg.querySelectorAll("button").forEach(b=>b.disabled=!on); setPropSegEnabled(on); }
-function showResult(url){ els.stripPreview.src=url; if(els.closeResult) els.closeResult.style.display="none"; els.result.classList.add("show"); clearTimeout(state.resultTimer); state.resultTimer=setTimeout(()=>{ if(els.result.classList.contains("show")) hideResult(); }, 45000); clearTimeout(state.closeRevealTimer); state.closeRevealTimer=setTimeout(()=>{ if(els.closeResult) els.closeResult.style.display=""; }, 8000); }
+function showResult(url){ els.stripPreview.src=url; if(els.closeResult) els.closeResult.style.display="none"; { const t=CONFIG.collection&&CONFIG.collection.target; if(CONFIG.collection&&CONFIG.collection.enabled&&(t==="cloud"||t==="both")) showStripQrLoading(); } els.result.classList.add("show"); clearTimeout(state.resultTimer); state.resultTimer=setTimeout(()=>{ if(els.result.classList.contains("show")) hideResult(); }, 45000); clearTimeout(state.closeRevealTimer); state.closeRevealTimer=setTimeout(()=>{ if(els.closeResult) els.closeResult.style.display=""; }, 8000); }
 function setBoomResultUI(boom){
   const v=document.querySelector("#boomVid"); if(!v) return;
   if(boom && boom.blob){ v.src=URL.createObjectURL(boom.blob); v.style.display=""; }
