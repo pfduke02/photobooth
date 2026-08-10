@@ -247,6 +247,8 @@
           <div id="stripQrSub" style="font:500 10.5px var(--font); color:#666; margin-top:3px;">press &amp; hold the photo → “Save to Photos”</div>
         </div>
         <video id="boomVid" loop muted playsinline autoplay style="display:none; width:100%; max-width:240px; border-radius:10px; border:1px solid #303445;"></video>
+        <button class="btn primary" id="printBtn">🖨 Print strip</button>
+        <button class="btn" id="sheetShareBtn" style="font-size:13px; padding:9px 14px;">📤 Save / send to SELPHY app</button>
         <button class="btn primary" id="againBtn">↺ Take another</button>
         <button class="btn" id="boomSave" style="display:none">🌀 Save boomerang</button>
         <!-- Strip already saves automatically (cloud + gallery) — this is just a
@@ -282,7 +284,7 @@
 const CONFIG = {
   brandTitle:"Photobooth", brandSubtitle:"", stripFooter:"PHOTOBOOTH",
   numPhotos:3, countdownSeconds:3, betweenShotsMs:900,
-  mirror:true, exportScale:2, frameAspect:4/3,
+  mirror:true, exportScale:2, frameAspect:4/3, printCutLine:true,
   ai:{ modelSelection:1, featherPx:2, blurPx:16, defaultBg:"blur" },
   // COLLECTION: after each session, POST {strip, frames[], meta} to an endpoint.
   //   target:"cloud" → Supabase Edge Function (durable; survives browser clears)
@@ -395,7 +397,7 @@ const els = {
   review:$("#review"), rvThumbs:$("#rvThumbs"), rvOk:$("#rvOk"),
   gallery:$("#gallery"), clearGallery:$("#clearGallery"),
   result:$("#result"), stripPreview:$("#stripPreview"), uploadStatus:$("#uploadStatus"),
-  downloadBtn:$("#downloadBtn"), againBtn:$("#againBtn"), retryUpload:$("#retryUpload"), closeResult:$("#closeResult"),
+  downloadBtn:$("#downloadBtn"), printBtn:$("#printBtn"), sheetShareBtn:$("#sheetShareBtn"), againBtn:$("#againBtn"), retryUpload:$("#retryUpload"), closeResult:$("#closeResult"),
   brandTitle:$("#brandTitle"),
 };
 const procCtx = els.proc.getContext("2d");
@@ -1086,6 +1088,32 @@ function composeStrip(shots, themeId, scale){
   try { return c.toDataURL("image/png"); }
   catch(e){ showToast("Export blocked — a cross-origin background tainted the canvas. Upload the image instead of using its URL."); return null; }
 }
+/* PRINT SHEET: two identical strips side by side on a 4×6" sheet (1200×1800
+   logical @300 DPI, exported at CONFIG.exportScale → 2400×3600 px). Print
+   borderless on the Selphy, cut down the center → two 2×6 strips (keep one /
+   give one). Takes the already-composed strip PNG so the sheet is pixel-
+   identical to what's shown on the result screen. */
+function composePrintSheet(stripUrl){
+  return new Promise((resolve,reject)=>{
+    if(!stripUrl){ reject(new Error("no strip yet")); return; }
+    const S=CONFIG.exportScale, sheetW=1200, sheetH=1800, stripW=600;   // 4×6, each strip 2" wide
+    const im=new Image();
+    im.onload=()=>{
+      try{
+        const c=document.createElement("canvas"); c.width=sheetW*S; c.height=sheetH*S;
+        const ctx=c.getContext("2d"); ctx.scale(S,S); ctx.imageSmoothingQuality="high";
+        ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,sheetW,sheetH);       // borderless base
+        ctx.drawImage(im, 0,0, stripW,sheetH);                          // left strip
+        ctx.drawImage(im, stripW,0, stripW,sheetH);                     // right strip
+        if(CONFIG.printCutLine){ ctx.fillStyle="rgba(0,0,0,.12)"; ctx.fillRect(stripW-0.5,0,1,sheetH); }  // center cut guide
+        resolve(c.toDataURL("image/png"));
+      }catch(e){ reject(e); }
+    };
+    im.onerror=()=>reject(new Error("strip image failed to load"));
+    im.src=stripUrl;
+  });
+}
+window.__PB.makePrintSheet=()=>composePrintSheet(state.lastStripURL);
 /* Comic pixel pass on one strip cell: quantize RGB to 4 levels, then screen a
    grid of black halftone dots sized by darkness. Runs in DEVICE pixels (the
    strip ctx is scale(S,S)-transformed; getImageData ignores transforms). */
@@ -1166,6 +1194,8 @@ els.bgUrlBtn.addEventListener("click", useBgUrl);
 els.bgUrl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") useBgUrl(); });
 els.countSeg.addEventListener("click", (e)=>{ const b=e.target.closest("button[data-n]"); if(!b) return; state.numPhotos=parseInt(b.dataset.n,10); els.countSeg.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b)); });
 els.downloadBtn.addEventListener("click", saveStrip);
+els.printBtn.addEventListener("click", airPrintSheet);
+els.sheetShareBtn.addEventListener("click", savePrintSheet);
 document.querySelector("#boomSave").addEventListener("click", saveBoomerang);
 /* On phones/tablets, "save" opens the native share sheet (Save to Photos,
    AirDrop, Messages…) via the Web Share API; on desktop it downloads. */
@@ -1181,6 +1211,49 @@ async function saveStrip(){
     }
   }catch(e){ if(e && e.name==="AbortError") return; /* user closed the sheet */ }
   downloadURL(url, name);
+}
+function printFilename(){ const d=new Date(), p=(x)=>String(x).padStart(2,"0"); return `LisaPete_printsheet_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.png`; }
+/* Save / hand-off path: build the 4×6 two-strip sheet, then share it (iOS share
+   sheet → Canon SELPHY app, or Save to Photos) or download (desktop). */
+async function savePrintSheet(){
+  if(!state.lastStripURL) return;
+  const btn=els.sheetShareBtn, orig=btn?btn.textContent:"";
+  if(btn){ btn.disabled=true; btn.textContent="📤 Preparing…"; }
+  try{
+    const url=await composePrintSheet(state.lastStripURL);
+    const name=printFilename();
+    const touch=matchMedia("(pointer:coarse)").matches;
+    if(touch && navigator.canShare){
+      const blob=await (await fetch(url)).blob();
+      const file=new File([blob], name, {type:"image/png"});
+      if(navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:"Photobooth print sheet"}); return; }
+    }
+    downloadURL(url, name);
+  }catch(e){ if(e && e.name==="AbortError") return; showToast("Couldn't build the print sheet — try again."); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=orig; } }
+}
+/* Direct AirPrint path: build the 4×6, drop it into a hidden iframe sized to the
+   4×6 page with zero margin, and fire the OS print dialog (Safari → AirPrint →
+   Selphy). No app-switch, no save-to-Photos. */
+async function airPrintSheet(){
+  if(!state.lastStripURL) return;
+  const btn=els.printBtn, orig=btn?btn.textContent:"";
+  if(btn){ btn.disabled=true; btn.textContent="🖨 Preparing…"; }
+  try{
+    const url=await composePrintSheet(state.lastStripURL);
+    const f=document.createElement("iframe");
+    f.setAttribute("aria-hidden","true");
+    f.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0";
+    document.body.appendChild(f);
+    const d=f.contentWindow.document;
+    d.open();
+    d.write('<!doctype html><html><head><style>@page{size:4in 6in;margin:0}html,body{margin:0;padding:0}img{width:4in;height:6in;display:block;object-fit:cover}</style></head><body><img src="'+url+'"></body></html>');
+    d.close();
+    const img=d.images[0];
+    const fire=()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){} setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 60000); };
+    if(img && !img.complete){ img.onload=fire; img.onerror=fire; } else { fire(); }
+  }catch(e){ showToast("Couldn't start AirPrint — use Save / send to SELPHY instead."); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=orig; } }
 }
 els.againBtn.addEventListener("click", ()=>{ hideResult(); runSession(); });
 els.retryUpload.addEventListener("click", ()=>{
