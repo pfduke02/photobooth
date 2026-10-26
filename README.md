@@ -1,82 +1,29 @@
-# Photobooth · V1.0
+# Photobooth — Lisa & Pete, Nov 7 2026
 
-A browser-based digital photobooth with **cloud + local collection**, ready to
-host on a **public URL**.
+Live booth: https://photobooth-c7s.pages.dev/ · gallery: `/gallery.html`
 
-**V1.0 (Sprint 1):** print-true strips — exactly **2×6" @ 300 DPI** (exported
-2×, 1200×3600; square cells for 3-shot) so future printing needs no resample;
-countdown beeps + shutter click (WebAudio, no files); `noindex,nofollow` +
-`_headers`; upload endpoint hardened (shared booth key + payload validation);
-`sessions` table gained query columns (`ai_enabled`, `app_version`, `favorite`,
-`tags`, `note`) saved from day one.
+Cloudflare Pages auto-deploys every push to `main`, serving **only**
+`photobooth-repo/` (build output directory). Anything committed there is public.
 
-- **Booth** — webcam → 3s countdown → 3/4 photos → strip PNG → gallery →
-  download. On-device AI background replace (incl. the Lisa & Pete wedding
-  backdrop) and strip themes (Classic / Noir / Warm Film / Wedding).
-- **Collection** — each session POSTs `{strip, frames[], meta}` to storage.
-  On **localhost** it writes **both** local disk *and* the cloud; on a
-  **hosted URL** it auto-switches to **cloud-only** (there's no local server
-  there). Override with `?collect=local|cloud|both`.
-- **Gallery** (`gallery.html`) — reads the cloud by default (`?local=1` for the
-  local server). **📱 QR** buttons on both pages show a scannable code for the
-  current URL — that's how guests get to it once hosted.
+| Path | What |
+|---|---|
+| `photobooth-repo/` | The web app: booth (`index.html`), gallery, assets, local servers, tests. Full docs: [`photobooth-repo/README.md`](photobooth-repo/README.md). |
+| `supabase/` | Backend source: migrations + Edge Functions. See [`supabase/README.md`](supabase/README.md). |
+| `printserver.js` | Mac print server. Polls the Supabase `print_jobs` queue and prints each 4×6 sheet to the SELPHY via `lp`. Node built-ins only. |
+| `run-printserver.sh`, `com.lisapete.printserver.plist` | launchd wrapper; the plist expects this repo at `~/Code/photobooth`. Log: `printserver.log`. |
+| `deploy.sh` | Commit + push = deploy. Refuses to commit guest data. |
 
-## Run locally
+## Print server
 
 ```bash
-cd <this-folder>
-node server.mjs        # or: python3 server.py
-# open http://localhost:8099/
+lpstat -p                                              # SELPHY queue name
+PRINTER=Canon_SELPHY_CP1500 DRY_RUN=1 node printserver.js   # poll + download, no printing
+cp com.lisapete.printserver.plist ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.lisapete.printserver.plist
 ```
 
-`index.html` is the booth (renamed from photobooth.html so the bare URL works
-when hosted). The local server serves it at `/` and saves sessions to
-`sessions/<id>/{strip.png, frame-N.jpg, metadata.json}`.
+## Guest data
 
-**If the status ever shows `💾 local ✗`:** open http://localhost:8099/api/health.
-`{"ok":true}` → the right server is running (then check the folder is writable —
-macOS sometimes blocks writes in Downloads; move the folder to e.g. ~/photobooth).
-An error/404 → you're running a plain static server (or double-clicked the
-file); quit it and run `node server.mjs` / `python3 server.py` from this folder.
-On the public URL this doesn't apply — uploads go cloud-only.
-
-## Host it publicly (Cloudflare Pages ← GitHub, free)
-
-The repo is the deploy source — every push to `main` auto-deploys:
-
-1. Code lives at **github.com/pfduke02/photobooth**.
-2. **dash.cloudflare.com → Workers & Pages → Create → Pages → Connect to Git**,
-   authorize GitHub, pick `pfduke02/photobooth`.
-3. Build settings: Framework preset **None**, build command **empty**, build
-   output directory **`/`** → Deploy.
-4. You get `https://<name>.pages.dev` — HTTPS, so the camera works. On a hosted
-   URL the app auto-switches to **cloud-only** collection (no local server
-   there); uploads go to Supabase, the gallery reads from it anywhere, and the
-   `_headers` file adds `X-Robots-Tag: noindex`.
-
-**Custom domain (later, optional):** DNS is on Cloudflare, so either attach
-`photobooth.sternfishmanwedding.com` in Pages → Custom domains (one CNAME), or
-mount `sternfishmanwedding.com/photobooth` with a small Worker route. The app
-is base-path-safe either way.
-
-## The cloud backend (Supabase project `photobooth`)
-
-In your Supabase account (org "Data Collector"): Storage bucket `sessions`
-(strips + frames under `<id>/`), Postgres table `sessions` (metadata — query it
-with SQL), Edge Function `session` (receives uploads; CORS `*`). The anon key in
-the frontend is public-by-design; strips are readable only via unguessable
-per-session IDs. Lock down later with signed URLs/auth if wanted.
-
-## Test it
-
-```bash
-npm install playwright
-node server.mjs &
-node test.mjs && node test_collection.mjs && node test_gallery.mjs \
-  && node test_themes.mjs && node test_both.mjs
-```
-
-## What's next
-
-Central Park backdrop (needs the photo file); booth polish (boomerang/GIF,
-sounds); auth/locking for the gallery. See `ROADMAP.md`.
+`sync.py` and `server.mjs` write guest photos to `photobooth-repo/sessions/` and
+`photobooth-repo/strips/`. Both are gitignored, and `deploy.sh` aborts if they
+are ever staged, because a commit there would publish them on the live site.
