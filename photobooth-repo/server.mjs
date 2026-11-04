@@ -25,7 +25,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
-const SESSIONS_DIR = path.join(ROOT, 'sessions');
+const SESSIONS_DIR = process.env.SESSIONS_DIR || path.join(ROOT, 'sessions');
 const PORT = process.env.PORT || 8099;
 const MAX_BODY = 80 * 1024 * 1024; // 80 MB is plenty for 1 strip + a few frames
 
@@ -60,7 +60,7 @@ function readBody(req){
 
 // ---- core: persist one session to sessions/<id>/ ----------------------------
 async function saveSession(payload){
-  const id = newId();
+  const id = typeof payload.id === 'string' && /^\d{4}-\d{2}-\d{2}_[0-9a-f]{6,12}$/.test(payload.id) ? payload.id : newId();
   const dir = path.join(SESSIONS_DIR, id);
   await fs.mkdir(dir, { recursive:true });
   const files = [];

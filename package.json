@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "start": "node photobooth-repo/server.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
   "dependencies": {
     "@mediapipe/selfie_segmentation": "^0.1.1675465747",
     "playwright": "^1.61.1",

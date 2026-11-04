@@ -201,3 +201,7 @@ Phase 2B stretch — swap a diffusion img2img (Stable Diffusion / ControlNet)
 into the same `/restyle` endpoint; gallery text search; printing (strips are
 already print-true 2×6" @300dpi). Central Park backdrop still needs the photo
 file. See `ROADMAP.md`.
+
+## Reliable archive + SELPHY printing
+
+The result screen now tracks Supabase saving separately from the Mac print queue. Pending uploads/print requests survive reloads in IndexedDB; retries reuse the same IDs. Print waits for the strip's cloud archive, then requests one 4×6 sheet. The on-site Mac worker must be running. See the repository-root README for MacBook Air installation, release order, and automated tests (`npm test` from the root).

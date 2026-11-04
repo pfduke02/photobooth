@@ -1,3 +1,6 @@
 printserver.log
 .DS_Store
 node_modules/
+sessions/
+strips/
+test-results/

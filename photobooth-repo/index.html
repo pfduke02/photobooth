@@ -147,7 +147,7 @@
 <body>
   <header>
     <h1 id="brandTitle">Photobooth</h1>
-    <p id="brandSub">V2.4 · booth · AI props + restyle · cloud + local collection · gallery</p>
+    <p id="brandSub">V2.4.1 · booth · AI props + restyle · cloud + local collection · gallery</p>
   </header>
 
   <main>
@@ -225,6 +225,7 @@
         <button class="btn ghost sm" id="galleryLink" title="Browse saved sessions">🖼 Gallery</button>
         <button class="btn ghost sm" id="qrBtn" title="QR code for this page">📱 QR</button>
         <button class="btn ghost sm" id="switchCam" style="display:none">⇆ Camera</button>
+        <span id="pendingDelivery" class="hint" aria-live="polite"></span>
         <span id="collState" class="hint" title="Where sessions are being saved">● collection: …</span>
       </div>
 
@@ -254,7 +255,8 @@
           <button class="btn primary big" id="printBtn">🖨 Print</button>
           <button class="btn primary big" id="againBtn">↺ Redo</button>
         </div>
-        <p id="uploadStatus" class="ustat"></p>
+        <p id="uploadStatus" class="ustat" aria-live="polite"></p>
+        <p id="printStatus" class="ustat" aria-live="polite"></p>
         <div id="stripQr" style="display:none; text-align:center; background:#fff; border-radius:14px; padding:14px; margin:2px 0 8px;">
           <img id="stripQrImg" alt="QR code for this strip" style="width:210px; height:210px; image-rendering:pixelated; display:block; margin:0 auto;" />
           <div id="stripQrCap" style="font:700 14px var(--font); color:#222; margin-top:8px;">📱 Scan to get your photos on your phone</div>
@@ -272,6 +274,7 @@
   <!-- ?v= busts any stale immutable-cached copy (early deploys served missing
        asset paths as index.html with 200 + our immutable header — Chrome then
        kept executing cached HTML as JS until the URL changed). Bump with appVersion. -->
+  <script src="assets/delivery.js?v=2.4.1"></script>
   <script src="assets/qrcode.js?v=2.4"></script>
   <script src="assets/mediapipe/selfie_segmentation.js?v=2.4"></script>
 <script>
@@ -337,7 +340,7 @@ const CONFIG = {
   // the cloud copy, and the gallery all carry the restyled frame with zero
   // contract changes. Capture NEVER depends on the sidecar.
   restyle:{ enabled:true, endpoint:"http://127.0.0.1:8123", timeoutMs:15000 },
-  appVersion:"2.4",
+  appVersion:"2.4.1",
   strip:{ bg:"#ffffff", frame:"#111111", accent:"#c98a6b", text:"#111111", sub:"#8a8a8a" },
   galleryMax:24,
 };
@@ -748,9 +751,12 @@ async function runSession(){
   state.lastBoomerang=boom||null;
   window.__PB.done=true;
   if(url){
-    saveToGallery(url); showResult(url); setBoomResultUI(boom);
+    saveToGallery(url); setBoomResultUI(boom);
     const boomDataUrl = boom ? await blobToDataURL(boom.blob) : null;
-    uploadSession(buildSession(shots, url, boomDataUrl));   // COLLECTION: background upload — never blocks capture
+    const session=buildSession(shots, url, boomDataUrl);
+    lastSession=session;
+    showResult(url); resetPrintStatus();
+    uploadSession(session);   // Persist and upload while the next guest uses the booth
   }
   state.busy=false; setControlsEnabled(true); document.body.classList.remove("capturing");
 }
@@ -943,7 +949,7 @@ function buildSession(shots, stripUrl, boomDataUrl){
   let frames=[];
   try { frames = shots.map(cv=>cv.toDataURL("image/jpeg", CONFIG.collection.jpegQuality)); } catch(e){ frames=[]; }
   return {
-    createdAt:new Date().toISOString(), numPhotos:shots.length, strip:stripUrl, frames,
+    id:PBDelivery.newId(), createdAt:new Date().toISOString(), numPhotos:shots.length, strip:stripUrl, frames,
     boomerang: boomDataUrl||undefined,
     meta:{ version:CONFIG.appVersion, mirror:state.mirror, aiEnabled:state.aiOn, stripTheme:state.stripTheme,
            background: state.aiOn ? state.currentBg.id : "none",
@@ -954,40 +960,29 @@ function buildSession(shots, stripUrl, boomDataUrl){
            client:{ userAgent:navigator.userAgent, viewport:[window.innerWidth,window.innerHeight], dpr:window.devicePixelRatio||1 } },
   };
 }
-// POST the session to one destination ("local" or "cloud"); never throws.
-async function postOne(kind, session){
-  const C=CONFIG.collection;
-  const endpoint = kind==="cloud" ? C.cloud.endpoint : C.local.endpoint;
-  const headers = { "Content-Type":"application/json" };
-  if(kind==="cloud"){ headers["apikey"]=C.cloud.anonKey; headers["Authorization"]="Bearer "+C.cloud.anonKey; headers["x-booth-key"]=C.cloud.boothKey; }
-  try {
-    const res=await fetch(endpoint,{ method:"POST", headers, body:JSON.stringify(session) });
-    if(!res.ok) throw new Error("HTTP "+res.status);
-    const data=await res.json(); if(!data.ok) throw new Error(data.error||"server error");
-    return { kind, ok:true, id:data.id, strip:data.strip||null };   // cloud returns the strip's public URL
-  } catch(e){ return { kind, ok:false, error:String(e.message||e) }; }
-}
-// Fire the upload(s) in the background. "both" writes local AND cloud in
-// parallel; capture never waits on either, and one failing doesn't lose the
-// other. Retry re-sends ONLY the failed destination(s) — no duplicates.
 let lastUploadMap=null;
-async function uploadSession(session, onlyTargets){
+const delivery = PBDelivery.create(CONFIG.collection, (record) => {
+  if(record.id!==lastSession?.id) return; // An older upload must not replace this guest's QR/status.
+  lastUploadMap=record.results;
+  const allOk=record.targets.every(k=>record.results[k]?.ok);
+  const anyOk=record.targets.some(k=>record.results[k]?.ok);
+  const status=allOk?"saved":record.sending?"uploading":anyOk?"partial":"failed";
+  const id=record.results.cloud?.id||record.results.local?.id||null;
+  window.__PB.upload={status,id,targets:record.results};
+  setUploadStatus(status,id,record.results,record.targets);
+  if(!record.durable && !allOk) els.uploadStatus.textContent+=" Keep this tab open—browser backup is unavailable.";
+  if(record.print){
+    if(record.print.result?.ok) watchPrint(record.id,record.print.result.jobId);
+    else setPrintStatus(record.id, record.sending?"Saving before printing…":"Print waiting—will retry automatically. Keep this booth open.");
+  }
+}, (count) => {
+  document.querySelector("#pendingDelivery").textContent=count?`${count} session${count===1?"":"s"} waiting to finish saving / sending`:"";
+});
+async function uploadSession(session){
   lastSession=session;
-  const C=CONFIG.collection;
-  if(!C.enabled){ setUploadStatus("disabled"); return; }
-  const all = C.target==="both" ? ["local","cloud"] : [C.target];
-  const targets = (onlyTargets && onlyTargets.length) ? onlyTargets : all;
-  if(!onlyTargets) lastUploadMap=null;              // fresh session → fresh slate
-  window.__PB.upload={ status:"uploading", id:null, targets:lastUploadMap?{...lastUploadMap}:{} };
+  if(!CONFIG.collection.enabled){ setUploadStatus("disabled"); return; }
   setUploadStatus("uploading");
-  const results = await Promise.all(targets.map(k=>postOne(k, session)));
-  const byKind = lastUploadMap ? {...lastUploadMap} : {};
-  results.forEach(r=>{ byKind[r.kind]=r; });
-  lastUploadMap=byKind;
-  const anyOk = all.some(k=>byKind[k]&&byKind[k].ok);
-  const savedId = (byKind.cloud&&byKind.cloud.ok&&byKind.cloud.id) || (byKind.local&&byKind.local.ok&&byKind.local.id) || null;
-  window.__PB.upload={ status: anyOk?"saved":"failed", id:savedId, targets:byKind };
-  setUploadStatus(anyOk?"saved":"failed", savedId, byKind, all);
+  await delivery.save(session);
 }
 /* QR of THIS strip's public cloud URL — guests scan it and save the full-res
    strip straight to their phone. Shown once the cloud upload confirms. */
@@ -1019,14 +1014,14 @@ function hideStripQr(){ const el=document.querySelector("#stripQr"); if(el) el.s
 function setUploadStatus(s,id,byKind,targets){
   const el=els.uploadStatus, rb=els.retryUpload; if(!el) return; if(rb) rb.style.display="none";
   if(s==="uploading"){ el.textContent="💾 Saving session…"; el.style.color="var(--muted)"; showStripQrLoading(); return; }
-  if(s==="failed"){ el.textContent="⚠ Upload failed — your download & gallery copy still work."; el.style.color="var(--warn)"; if(rb) rb.style.display=""; hideStripQr(); if(els.closeResult) els.closeResult.style.display=""; return; }
-  if(s==="saved"){
+  if(s==="failed"){ el.textContent="⚠ Save pending — retrying automatically. Your download still works."; el.style.color="var(--warn)"; if(rb) rb.style.display=""; hideStripQr(); if(els.closeResult) els.closeResult.style.display=""; return; }
+  if(s==="saved"||s==="partial"){
     if(byKind && (byKind.cloud||byKind.local)){
       const bits=[];
-      if(byKind.cloud) bits.push("☁ cloud "+(byKind.cloud.ok?"✓":"✗"));
+      if(byKind.cloud) bits.push("☁ Supabase "+(byKind.cloud.ok?"✓":"✗"));
       if(byKind.local) bits.push("💾 local "+(byKind.local.ok?"✓":"✗"));
       const allOk=(targets||[]).every(k=>byKind[k]&&byKind[k].ok);
-      el.textContent="Saved — "+bits.join(" · ");
+      el.textContent=(allOk?"Saved — ":"Save pending — ")+bits.join(" · ");
       el.style.color=allOk?"var(--ok)":"var(--warn)";
       if(rb && !allOk) rb.style.display="";   // a destination failed — offer retry
       if(byKind.cloud && byKind.cloud.ok && byKind.cloud.strip) showStripQr(byKind.cloud.strip); else hideStripQr();
@@ -1250,28 +1245,57 @@ async function savePrintSheet(){
   }catch(e){ if(e && e.name==="AbortError") return; showToast("Couldn't build the print sheet — try again."); }
   finally{ if(btn){ btn.disabled=false; btn.textContent=orig; } }
 }
-/* One-tap print: compose the 4×6 sheet and drop it in the cloud print queue.
-   The Mac print server at the event picks it up and prints to the Selphy — no
-   share sheet, no printer dialog. Just a confirmation toast. */
+/* Print requests survive reloads alongside their session. The archive is
+   confirmed before the print job is created. Queue acceptance is not printing. */
+let watchedPrint=null, printTimer=null;
+function setPrintStatus(sessionId,text){
+  if(lastSession?.id===sessionId) document.querySelector("#printStatus").textContent=text;
+}
+function resetPrintStatus(){
+  clearTimeout(printTimer); watchedPrint=null;
+  document.querySelector("#printStatus").textContent="";
+  els.printBtn.disabled=false; els.printBtn.textContent="🖨 Print";
+}
+function watchPrint(sessionId,jobId){
+  if(lastSession?.id!==sessionId||watchedPrint===jobId) return;
+  watchedPrint=jobId;
+  els.printBtn.disabled=true; els.printBtn.textContent="✓ Print requested";
+  setPrintStatus(sessionId,"Queued—waiting for the booth Mac.");
+  const C=CONFIG.collection.cloud;
+  const root=C.endpoint.split('/functions/')[0];
+  async function check(){
+    if(lastSession?.id!==sessionId||watchedPrint!==jobId) return;
+    try{
+      const response=await fetch(`${root}/rest/v1/print_jobs?id=eq.${encodeURIComponent(jobId)}&select=status,error`,{
+        headers:{apikey:C.anonKey,Authorization:"Bearer "+C.anonKey},signal:AbortSignal.timeout(10000),cache:"no-store"
+      });
+      if(!response.ok) throw new Error("Status unavailable");
+      const job=(await response.json())[0];
+      if(!job) throw new Error("Job not found");
+      const messages={pending:"Queued—waiting for the booth Mac.",printing:"The booth Mac is preparing your print.",done:"Sent to the SELPHY print queue. Check the printer for your sheet.",error:"Printer needs attention. Your photos are saved—ask the booth host."};
+      setPrintStatus(sessionId,messages[job.status]||"Waiting for printer status…");
+      if(job.status==="done"||job.status==="error") return;
+    }catch{ setPrintStatus(sessionId,"Print requested. Cannot check printer status right now."); }
+    if(lastSession?.id===sessionId) printTimer=setTimeout(check,3000);
+  }
+  check();
+}
 async function enqueuePrint(){
-  if(!state.lastStripURL) return;
-  const btn=els.printBtn, orig=btn?btn.textContent:"";
-  if(btn){ btn.disabled=true; btn.textContent="🖨 Sending…"; }
+  const session=lastSession;
+  if(!session||!state.lastStripURL) return;
+  els.printBtn.disabled=true; els.printBtn.textContent="🖨 Preparing…";
+  setPrintStatus(session.id,"Saving your photos and preparing the print…");
   try{
-    const image=await composePrintSheet(state.lastStripURL);
-    const C=CONFIG.collection.cloud;
-    const endpoint=C.endpoint.replace(/\/[^/]+$/, "/print");
-    const res=await fetch(endpoint,{ method:"POST",
-      headers:{ "Content-Type":"application/json", "apikey":C.anonKey, "Authorization":"Bearer "+C.anonKey, "x-booth-key":C.boothKey },
-      body:JSON.stringify({ image }) });
-    if(!res.ok) throw new Error("HTTP "+res.status);
-    const data=await res.json(); if(!data.ok) throw new Error(data.error||"server error");
-    if(btn){ btn.textContent="✓ Sent to printer"; }
-    showToast("🖨 Sent to the printer!");
-    setTimeout(()=>{ if(btn){ btn.disabled=false; btn.textContent=orig; } }, 2500);
-  }catch(e){
-    if(btn){ btn.disabled=false; btn.textContent=orig; }
-    showToast("Couldn't reach the printer — is the Mac print server running?");
+    const image=await composePrintSheet(session.strip);
+    await delivery.requestPrint(session,image);
+    if(lastSession?.id===session.id&&!watchedPrint){
+      els.printBtn.disabled=false; els.printBtn.textContent="↻ Retry print";
+    }
+  }catch{
+    if(lastSession?.id===session.id){
+      els.printBtn.disabled=false; els.printBtn.textContent="↻ Retry print";
+      setPrintStatus(session.id,"Couldn't prepare the print. Please try again.");
+    }
   }
 }
 /* Direct AirPrint path: build the 4×6, drop it into a hidden iframe sized to the
@@ -1300,8 +1324,7 @@ async function airPrintSheet(){
 els.againBtn.addEventListener("click", ()=>{ hideResult(); runSession(); });
 els.retryUpload.addEventListener("click", ()=>{
   if(!lastSession) return;
-  const failed = lastUploadMap ? Object.keys(lastUploadMap).filter(k=>!lastUploadMap[k].ok) : null;
-  uploadSession(lastSession, failed && failed.length ? failed : null);   // only re-send what failed
+  uploadSession(lastSession);   // delivery remembers each successful destination
 });
 els.closeResult.addEventListener("click", hideResult);
 els.clearGallery.addEventListener("click", ()=>{ store.write([]); renderGallery(); });
