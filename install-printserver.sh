@@ -13,7 +13,7 @@ if ! "$NODE_PATH" -e 'if (Number(process.versions.node.split(".")[0]) < 22) proc
   echo 'Node.js 22 or newer is required.' >&2
   exit 1
 fi
-if ! lpstat -p "$PRINTER_NAME" >/dev/null 2>&1; then
+if ! lpstat -p "$PRINTER_NAME" >/dev/null 2>&1 && ! lpstat -c "$PRINTER_NAME" >/dev/null 2>&1; then
   echo "Printer '$PRINTER_NAME' was not found. Add the SELPHY in System Settings → Printers & Scanners."
   echo 'Available printer queue names:'
   lpstat -p || true

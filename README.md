@@ -85,6 +85,30 @@ PRINT_JOB_ID=YYYY-MM-DD_012345abcdef PRINTER=Canon_SELPHY_CP1500 node printserve
 
 Replace the placeholder with the actual test job ID. `--once` refuses to run without an explicit ID. It does not drain the queue or acknowledge unrelated local receipts. Exit 0 means the selected operation succeeded, 2 means the selected job was not pending, and 1 means an error. The continuous worker still starts immediately when the installer is run; do not use installation itself as a one-sheet test.
 
+## Booth day: preflight and two SELPHYs
+
+On the Air, from the repo root:
+
+```sh
+bash preflight.sh               # read-only: power, sleep, disk, node, repo, printer queue, worker, Supabase, site
+bash preflight.sh --print-test  # also prints one local test sheet (print-test-4x6.png) straight to the SELPHY
+```
+
+The test sheet's red border should reach all four edges; the grey inset lines show how much the printer trims.
+
+**Two SELPHYs:** put both into one CUPS class, then point the worker at the class. Jobs go to whichever printer is free:
+
+```sh
+lpstat -p                                       # note both queue names
+sudo lpadmin -p <first_queue>  -c selphys
+sudo lpadmin -p <second_queue> -c selphys
+sudo cupsenable selphys && sudo cupsaccept selphys
+bash install-printserver.sh selphys
+PRINTER=selphys bash preflight.sh --print-test  # run twice; each printer should take one sheet
+```
+
+To drop back to one printer, run `bash install-printserver.sh <first_queue>`. Both printers need the same paper/ink kit (KP-108IN, 4×6).
+
 ## Release order
 
 1. Deploy `supabase/functions/print` with JWT verification **on**. This adds retry-safe IDs while retaining compatibility with the old booth. It uses the existing bucket, table and policies; no database migration is required.
