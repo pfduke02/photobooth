@@ -24,6 +24,7 @@ after(async () => { await browser?.close(); server?.kill(); await rm(sessions, {
 
 async function booth(t, settings = {}) {
   const context = await browser.newContext({ permissions: ['camera'] });
+  context.setDefaultTimeout(10000);
   if (settings.noStorage) await context.addInitScript(() => {
     indexedDB.open = () => { throw new Error('Storage blocked'); };
   });
@@ -57,7 +58,7 @@ async function booth(t, settings = {}) {
     await page.click('#startBtn');
     await page.waitForFunction(() => window.__PB?.done && !!lastSession);
   };
-  return { page, calls, open, capture };
+  return { page, context, calls, open, capture };
 }
 
 test('capture saves to Supabase before print; queue is not reported as physical completion', async t => {
@@ -70,6 +71,7 @@ test('capture saves to Supabase before print; queue is not reported as physical 
   assert.equal(calls.prints[0].meta.sessionId, calls.saves[0].id);
   assert.match(await page.locator('#uploadStatus').innerText(), /Supabase ✓/);
   assert.equal(await page.locator('#printBtn').isDisabled(), true);
+  if (process.env.PB_REVIEW_SCREENSHOT) await page.screenshot({ path: process.env.PB_REVIEW_SCREENSHOT });
   const dimensions = await page.evaluate(async image => {
     const img = new Image(); img.src = image; await img.decode(); return [img.width, img.height];
   }, calls.prints[0].image);
@@ -177,4 +179,131 @@ test('blocked browser storage shows an honest warning and still permits an onlin
   await page.click('#retryUpload');
   await page.waitForFunction(() => window.__PB.upload?.status === 'saved');
   assert.match(await page.locator('#uploadStatus').innerText(), /Supabase ✓/);
+});
+
+test('cloud-confirmed printing does not wait for a hung local save', async t => {
+  const { page, calls, open, capture } = await booth(t);
+  let release;
+  await page.route('**/api/session', route => new Promise(resolve => {
+    release = async () => { await route.fulfill({ status: 503, json: { ok: false } }); resolve(); };
+  }));
+  try {
+    await open('both'); await capture();
+    await page.waitForFunction(() => delivery.records.get(lastSession.id)?.results.cloud?.ok);
+    await page.click('#printBtn');
+    await page.waitForFunction(() => document.querySelector('#printStatus').textContent.includes('waiting for the booth Mac'), null, { timeout: 1500 });
+    assert.equal(calls.prints.length, 1);
+    assert.match(await page.locator('#uploadStatus').innerText(), /Supabase ✓/);
+  } finally { if (release) await release(); }
+});
+
+test('a stale second tab cannot erase a pending print request', async t => {
+  const { page, context, calls, open, capture } = await booth(t, { failSave: true, failPrint: true });
+  await open(); await capture();
+  await page.waitForFunction(() => window.__PB.upload?.status === 'failed');
+  const other = await context.newPage();
+  let release;
+  await other.route('**/functions/v1/session', route => new Promise(resolve => {
+    release = async () => {
+      await route.fulfill({ json: { ok: true, id: route.request().postDataJSON().id } }); resolve();
+    };
+  }));
+  await other.goto(`${origin}/?fast=1&collect=cloud`);
+  await other.waitForFunction(() => [...delivery.records.values()].some(r => r.sending));
+  await page.click('#printBtn');
+  await page.waitForFunction(() => document.querySelector('#printBtn').textContent.includes('Retry'));
+  const printId = await page.evaluate(() => delivery.records.get(lastSession.id).print.id);
+  await release();
+  await other.waitForFunction(() => [...delivery.records.values()].every(r => !r.sending));
+  const persisted = await page.evaluate(async () => {
+    const db = await new Promise(resolve => { const req = indexedDB.open('photobooth-delivery', 1); req.onsuccess = () => resolve(req.result); });
+    const result = await new Promise(resolve => { const req = db.transaction('pending').objectStore('pending').get(lastSession.id); req.onsuccess = () => resolve(req.result); });
+    db.close(); return result;
+  });
+  assert.equal(persisted?.print?.id, printId);
+  assert.equal(calls.prints.length, 1); // The second tab discovers and attempts the preserved intent.
+});
+
+test('an unbacked print intent is disclosed even after its photos are archived', async t => {
+  const { page, open, capture } = await booth(t, { noStorage: true, failPrint: true });
+  await open(); await capture();
+  await page.waitForFunction(() => window.__PB.upload?.status === 'saved');
+  await page.click('#printBtn');
+  await page.waitForFunction(() => document.querySelector('#printBtn').textContent.includes('Retry'));
+  assert.match(await page.locator('#printStatus').innerText(), /browser backup is unavailable/);
+});
+
+test('a stale tab reuses a completed print receipt and stores no completed image payloads', async t => {
+  const { page, context, calls, open, capture } = await booth(t, { failSave: true });
+  await open(); await capture();
+  await page.waitForFunction(() => window.__PB.upload?.status === 'failed');
+  const other = await context.newPage();
+  let release;
+  await other.route('**/functions/v1/session', route => new Promise(resolve => {
+    release = async () => { await route.fulfill({ json: { ok: true, id: route.request().postDataJSON().id } }); resolve(); };
+  }));
+  await other.goto(`${origin}/?fast=1&collect=cloud`);
+  await other.waitForFunction(() => [...delivery.records.values()].some(r => r.sending));
+  calls.failSave = false;
+  await page.click('#printBtn');
+  await page.waitForFunction(() => document.querySelector('#printBtn').textContent.includes('requested'));
+  const printId = calls.prints[0].id;
+  await release();
+  await other.waitForFunction(() => [...delivery.records.values()].every(r => !r.sending));
+  await other.evaluate(async () => {
+    const record = [...delivery.records.values()][0];
+    await delivery.requestPrint(record.session, record.session.strip);
+  });
+  assert.equal(calls.prints.length, 1);
+  const stored = await page.evaluate(async () => {
+    const db = await new Promise(resolve => { const req = indexedDB.open('photobooth-delivery', 1); req.onsuccess = () => resolve(req.result); });
+    const value = await new Promise(resolve => { const req = db.transaction('pending').objectStore('pending').get(lastSession.id); req.onsuccess = () => resolve(req.result); });
+    db.close(); return value;
+  });
+  assert.equal(stored.print.id, printId);
+  assert.equal(stored.session, undefined);
+  assert.equal(stored.print.image, undefined);
+});
+
+test('a dense strip that fits the archive still produces a printable payload under the endpoint limit', async t => {
+  const { page, calls, open } = await booth(t);
+  await open();
+  const stripLength = await page.evaluate(async () => {
+    const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 3600;
+    const ctx = canvas.getContext('2d'); ctx.fillStyle = 'white'; ctx.fillRect(0, 0, 1200, 3600);
+    const noise = ctx.createImageData(1200, 2100);
+    let seed = 42;
+    for (let i = 0; i < noise.data.length; i += 4) {
+      for (let c = 0; c < 3; c++) { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; noise.data[i + c] = seed >>> 24; }
+      noise.data[i + 3] = 255;
+    }
+    ctx.putImageData(noise, 0, 0);
+    const strip = canvas.toDataURL();
+    const session = { id: PBDelivery.newId(), createdAt: new Date().toISOString(), numPhotos: 1, strip, frames: [], meta: { stripTheme: 'classic' } };
+    state.lastStripURL = strip; lastSession = session; showResult(strip); resetPrintStatus();
+    await uploadSession(session); await enqueuePrint();
+    return strip.length;
+  });
+  assert.ok(stripLength < 12_000_000, `original strip has ${stripLength} characters`);
+  assert.equal(calls.prints.length, 1);
+  assert.ok(calls.prints[0].image.length <= 12_000_000, `print payload has ${calls.prints[0].image.length} characters`);
+});
+
+test('phone guests can reach result actions and save/print statuses without clipping', async t => {
+  const { page, open, capture } = await booth(t);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(); await capture();
+  await page.waitForFunction(() => window.__PB.upload?.status === 'saved');
+  await page.locator('#closeResult').scrollIntoViewIfNeeded();
+  const bounds = await page.locator('#closeResult').boundingBox();
+  assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= 844, `Close bounds: ${JSON.stringify(bounds)}`);
+  await page.click('#printBtn');
+  await page.waitForFunction(() => document.querySelector('#printStatus').textContent.includes('waiting for the booth Mac'));
+  await page.locator('#printStatus').scrollIntoViewIfNeeded();
+  const status = await page.locator('#printStatus').boundingBox();
+  assert.ok(status.y >= 0 && status.y + status.height <= 844);
+  if (process.env.PB_REVIEW_MOBILE_SCREENSHOT) await page.screenshot({ path: process.env.PB_REVIEW_MOBILE_SCREENSHOT });
+  await page.click('#closeResult');
+  await capture();
+  assert.equal(await page.locator('#resultCard').evaluate(el => el.scrollTop), 0, 'each guest starts at the top of the result');
 });

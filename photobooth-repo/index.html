@@ -127,8 +127,8 @@
 
   #result { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(4,5,8,.82); backdrop-filter:blur(6px); z-index:20; padding:20px; }
   #result.show { display:flex; }
-  #resultCard { background:var(--panel); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); max-width:92vw; max-height:92vh; display:flex; gap:22px; align-items:center; }
-  @media (max-width:700px){ #resultCard{ flex-direction:column; } }
+  #resultCard { background:var(--panel); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); max-width:92vw; max-height:calc(100dvh - 40px); display:flex; gap:22px; align-items:flex-start; overflow-y:auto; overscroll-behavior:contain; }
+  @media (max-width:700px){ #resultCard{ flex-direction:column; align-items:center; } #resultCard #stripPreview{ max-height:35vh; flex-shrink:0; } #resultCard #resultActions{ width:100%; flex-shrink:0; } }
   #stripPreview { max-height:74vh; border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,.5); }
   #resultActions { display:flex; flex-direction:column; gap:12px; min-width:250px; }
   #resultActions h3 { margin:0 0 4px; font-size:18px; }
@@ -147,7 +147,7 @@
 <body>
   <header>
     <h1 id="brandTitle">Photobooth</h1>
-    <p id="brandSub">V2.4.1 · booth · AI props + restyle · cloud + local collection · gallery</p>
+    <p id="brandSub">V2.4.2 · booth · AI props + restyle · cloud + local collection · gallery</p>
   </header>
 
   <main>
@@ -274,7 +274,7 @@
   <!-- ?v= busts any stale immutable-cached copy (early deploys served missing
        asset paths as index.html with 200 + our immutable header — Chrome then
        kept executing cached HTML as JS until the URL changed). Bump with appVersion. -->
-  <script src="assets/delivery.js?v=2.4.1"></script>
+  <script src="assets/delivery.js?v=2.4.2"></script>
   <script src="assets/qrcode.js?v=2.4"></script>
   <script src="assets/mediapipe/selfie_segmentation.js?v=2.4"></script>
 <script>
@@ -340,7 +340,7 @@ const CONFIG = {
   // the cloud copy, and the gallery all carry the restyled frame with zero
   // contract changes. Capture NEVER depends on the sidecar.
   restyle:{ enabled:true, endpoint:"http://127.0.0.1:8123", timeoutMs:15000 },
-  appVersion:"2.4.1",
+  appVersion:"2.4.2",
   strip:{ bg:"#ffffff", frame:"#111111", accent:"#c98a6b", text:"#111111", sub:"#8a8a8a" },
   galleryMax:24,
 };
@@ -966,14 +966,18 @@ const delivery = PBDelivery.create(CONFIG.collection, (record) => {
   lastUploadMap=record.results;
   const allOk=record.targets.every(k=>record.results[k]?.ok);
   const anyOk=record.targets.some(k=>record.results[k]?.ok);
-  const status=allOk?"saved":record.sending?"uploading":anyOk?"partial":"failed";
+  const status=allOk?"saved":anyOk?"partial":record.sending?"uploading":"failed";
   const id=record.results.cloud?.id||record.results.local?.id||null;
   window.__PB.upload={status,id,targets:record.results};
   setUploadStatus(status,id,record.results,record.targets);
   if(!record.durable && !allOk) els.uploadStatus.textContent+=" Keep this tab open—browser backup is unavailable.";
   if(record.print){
     if(record.print.result?.ok) watchPrint(record.id,record.print.result.jobId);
-    else setPrintStatus(record.id, record.sending?"Saving before printing…":"Print waiting—will retry automatically. Keep this booth open.");
+    else {
+      let message=record.sending?"Saving before printing…":"Print waiting—will retry automatically. Keep this booth open.";
+      if(!record.durable) message+=" Keep this tab open—browser backup is unavailable.";
+      setPrintStatus(record.id,message);
+    }
   }
 }, (count) => {
   document.querySelector("#pendingDelivery").textContent=count?`${count} session${count===1?"":"s"} waiting to finish saving / sending`:"";
@@ -1020,6 +1024,8 @@ function setUploadStatus(s,id,byKind,targets){
       const bits=[];
       if(byKind.cloud) bits.push("☁ Supabase "+(byKind.cloud.ok?"✓":"✗"));
       if(byKind.local) bits.push("💾 local "+(byKind.local.ok?"✓":"✗"));
+      if((targets||[]).includes("local")&&!byKind.local) bits.push("💾 local saving…");
+      if((targets||[]).includes("cloud")&&!byKind.cloud) bits.push("☁ Supabase saving…");
       const allOk=(targets||[]).every(k=>byKind[k]&&byKind[k].ok);
       el.textContent=(allOk?"Saved — ":"Save pending — ")+bits.join(" · ");
       el.style.color=allOk?"var(--ok)":"var(--warn)";
@@ -1175,7 +1181,7 @@ function downloadURL(url,filename){ const a=document.createElement("a"); a.href=
 function buildShotDots(n){ els.shotDots.innerHTML=""; for(let i=0;i<n;i++){ const d=document.createElement("div"); d.className="dot"; els.shotDots.appendChild(d); } els.shotDots.classList.remove("hidden"); }
 function markShotDone(i){ const d=els.shotDots.children[i]; if(d) d.classList.add("done"); }
 function setControlsEnabled(on){ els.startBtn.disabled=!on||!state.stream; els.switchCam.disabled=!on; els.mirrorBtn.disabled=!on; els.bgToggle.disabled=!on; els.countSeg.querySelectorAll("button").forEach(b=>b.disabled=!on); setPropSegEnabled(on); }
-function showResult(url){ els.stripPreview.src=url; if(els.closeResult) els.closeResult.style.display="none"; { const t=CONFIG.collection&&CONFIG.collection.target; if(CONFIG.collection&&CONFIG.collection.enabled&&(t==="cloud"||t==="both")) showStripQrLoading(); } els.result.classList.add("show"); clearTimeout(state.resultTimer); state.resultTimer=setTimeout(()=>{ if(els.result.classList.contains("show")) hideResult(); }, 45000); clearTimeout(state.closeRevealTimer); state.closeRevealTimer=setTimeout(()=>{ if(els.closeResult) els.closeResult.style.display=""; }, 8000); }
+function showResult(url){ els.stripPreview.src=url; if(els.closeResult) els.closeResult.style.display="none"; { const t=CONFIG.collection&&CONFIG.collection.target; if(CONFIG.collection&&CONFIG.collection.enabled&&(t==="cloud"||t==="both")) showStripQrLoading(); } els.result.classList.add("show"); document.querySelector("#resultCard").scrollTop=0; clearTimeout(state.resultTimer); state.resultTimer=setTimeout(()=>{ if(els.result.classList.contains("show")) hideResult(); }, 45000); clearTimeout(state.closeRevealTimer); state.closeRevealTimer=setTimeout(()=>{ if(els.closeResult) els.closeResult.style.display=""; }, 8000); }
 function setBoomResultUI(boom){
   const v=document.querySelector("#boomVid"); if(!v) return;
   if(boom && boom.blob){ v.src=URL.createObjectURL(boom.blob); v.style.display=""; }

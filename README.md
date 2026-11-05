@@ -20,6 +20,8 @@ The result screen distinguishes:
 
 Pending sessions and print requests are kept in IndexedDB. They retry every 30 seconds, on reconnect, and when the same site is reopened in the same browser profile. Successful destinations are not resent. Stable session and print IDs avoid duplicates after a lost response. If browser storage is unavailable, the UI says to keep the tab open. Clearing site data/private browsing can remove pending backups. Cloud printing requires internet access; offline requests wait for reconnection.
 
+Updates from multiple tabs are merged in a single IndexedDB transaction. Small completed-job receipts retain IDs and success results so a stale tab cannot recreate a print; completed receipts contain no image payloads. A slow local save does not hold up a print whose Supabase archive is confirmed. Save status and the QR update as each destination finishes.
+
 ## Run locally
 
 Use Node.js 22 or newer:
@@ -59,7 +61,20 @@ launchctl bootout "gui/$(id -u)/com.lisapete.printserver"
 DRY_RUN=1 node printserver.js
 ```
 
-The worker uses `media=Postcard.Fullbleed`; override `LP_OPTS` for a manual run if needed. Local print receipts live under `~/Library/Application Support/Photobooth/print-spool`. If acknowledgement fails after `lp` accepts a job, the worker retries acknowledgement without printing again. If the Mac crashes during submission, the job can remain `printing`: inspect the macOS queue and physical output before manually requeuing it. Never automatically reset claimed jobs, because that can duplicate a sheet.
+The worker uses `media=Postcard.Fullbleed`; override `LP_OPTS` for a manual run if needed. Local print receipts live under `~/Library/Application Support/Photobooth/print-spool`. If acknowledgement fails after `lp` accepts a job, the worker retries acknowledgement without printing again. A receipt is retained until the row is confirmed as `done`, then kept as a small `.submitted.json` marker. A conflicting row state stops the worker with a host-attention message. Do not delete these markers or reset a submitted job to `pending`; use a new job ID for an intentional extra sheet.
+
+If the Mac crashes during submission, the job can remain `printing`: inspect the macOS queue and physical output before taking action. Neither a cloud queue acknowledgement nor a successful `lp` exit proves that a sheet emerged from the SELPHY.
+
+For one controlled test, stop all background workers first and select the exact test job:
+
+```sh
+# Read/download only; leaves this and every other job unchanged:
+PRINT_JOB_ID=YYYY-MM-DD_012345abcdef DRY_RUN=1 node printserver.js --once
+# Submit only this pending job, then exit:
+PRINT_JOB_ID=YYYY-MM-DD_012345abcdef PRINTER=Canon_SELPHY_CP1500 node printserver.js --once
+```
+
+Replace the placeholder with the actual test job ID. `--once` refuses to run without an explicit ID. It does not drain the queue or acknowledge unrelated local receipts. Exit 0 means the selected operation succeeded, 2 means the selected job was not pending, and 1 means an error. The continuous worker still starts immediately when the installer is run; do not use installation itself as a one-sheet test.
 
 ## Release order
 
