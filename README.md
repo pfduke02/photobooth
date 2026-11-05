@@ -4,6 +4,15 @@ Live booth: **https://photobooth-c7s.pages.dev/**
 
 The active app is in **`photobooth-repo/`**. Its `index.html` matches the deployed site; the root `index.html` is a legacy copy. Cloudflare Pages must publish `photobooth-repo`, not the repository root.
 
+## Repo map
+
+| Path | What |
+|---|---|
+| `photobooth-repo/` | The web app Cloudflare Pages publishes (booth, gallery, assets, local server). Anything committed here is public. |
+| `supabase/` | Backend source: migrations and the `session`, `print`, `admin` Edge Functions. See [`supabase/README.md`](supabase/README.md). |
+| `printserver.js`, `install-printserver.sh` | MacBook Air print worker and its launch-agent installer. |
+| `deploy.sh` | Commit + push = deploy. Refuses to commit guest data (`sessions/`, `strips/`, `prints/`). |
+
 ## Saving and printing
 
 Each finished session gets one ID. Its strip, original frames and optional boomerang are saved to the Supabase `photobooth` project (`xjnqnxorqhobikyzshrt`), in the `sessions` bucket and table. This happens whether or not the guest prints.
