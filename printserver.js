@@ -34,7 +34,8 @@ function createWorker(options = {}) {
   const printer = options.printer || process.env.PRINTER || 'Canon_SELPHY_CP1500';
   const run = options.exec || ((cmd, args) => new Promise((resolve, reject) =>
     execFile(cmd, args, { timeout: 15000 }, (error, stdout, stderr) =>
-      error ? reject(new Error((stderr || error.message).trim())) : resolve(String(stdout)))));
+      // lpstat exits non-zero if ANY named queue is missing but still reports the others
+      error && !(cmd === 'lpstat' && String(stdout).trim()) ? reject(new Error((stderr || error.message).trim())) : resolve(String(stdout)))));
   // Tests that inject fetch/print stay single-printer and offline unless they opt in.
   const fixedPrinters = options.printers || (process.env.PRINTERS ? process.env.PRINTERS.split(',').map(x => x.trim()).filter(Boolean) : null);
   const detect = !fixedPrinters && !options.print;
