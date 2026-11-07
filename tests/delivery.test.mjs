@@ -18,7 +18,7 @@ before(async () => {
     server.once('exit', code => reject(new Error(`Server exited ${code}`)));
     server.once('error', reject);
   });
-  browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
+  browser = await chromium.launch({ ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}), args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
 });
 after(async () => { await browser?.close(); server?.kill(); await rm(sessions, { recursive: true, force: true }); });
 

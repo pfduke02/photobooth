@@ -340,7 +340,7 @@ const CONFIG = {
   // the cloud copy, and the gallery all carry the restyled frame with zero
   // contract changes. Capture NEVER depends on the sidecar.
   restyle:{ enabled:true, endpoint:"http://127.0.0.1:8123", timeoutMs:15000 },
-  appVersion:"2.4.2",
+  appVersion:"2.4.3",
   strip:{ bg:"#ffffff", frame:"#111111", accent:"#c98a6b", text:"#111111", sub:"#8a8a8a" },
   galleryMax:24,
 };
@@ -433,18 +433,62 @@ window.__PB = { ready:false, aiReady:false, done:false, count:0, lastStrip:null,
                 setProp:(id)=>selectProp(id) };
 
 /* ---------- 3) camera ----------------------------------------------------- */
+let camStarting=false, camRetryT=null, camLastErr=null;
 async function startCamera(deviceId=null){
+  if(camStarting) return;
+  camStarting=true; clearTimeout(camRetryT);
+  if(deviceId) state.camDeviceId=deviceId;
+  const want=deviceId||state.camDeviceId||null;
   stopStream();
-  const constraints = { audio:false, video: deviceId ? { deviceId:{ exact:deviceId } } : { facingMode:"user", width:{ideal:1280}, height:{ideal:720} } };
+  const constraints = { audio:false, video: want ? { deviceId:{ exact:want } } : { facingMode:"user", width:{ideal:1280}, height:{ideal:720} } };
   try {
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia(constraints); }
+    catch(e){ if(!want || e.name==="NotAllowedError") throw e; state.camDeviceId=null;   // that camera is gone: take any camera
+      stream = await navigator.mediaDevices.getUserMedia({ audio:false, video:{ facingMode:"user", width:{ideal:1280}, height:{ideal:720} } }); }
     state.stream = stream; els.video.srcObject = stream;
+    // A webcam cable bumped, the iPad camera taken by another app, the laptop lid shut:
+    // the track ends. Reconnect instead of letting guests photograph a frozen frame.
+    stream.getVideoTracks().forEach(t=>t.addEventListener("ended", ()=>{ if(state.stream===stream) cameraLost("ended"); }));
     await els.video.play().catch(()=>{});
     await new Promise((r)=>{ if(els.video.videoWidth) return r(); els.video.onloadedmetadata=()=>r(); setTimeout(r,1500); });
     sizeProc();
-    els.camError.classList.remove("show"); els.startBtn.disabled=false; window.__PB.ready=true;
+    camLastErr=null; camVideoT=-1; camStallSince=0;
+    els.camError.classList.remove("show"); els.startBtn.disabled=state.busy; window.__PB.ready=true; window.__PB.cameraRestarts=(window.__PB.cameraRestarts||0);
     startLoop(); await enumerateCameras();
-  } catch(err){ showCamError(err); }
+  } catch(err){
+    camLastErr=err; showCamError(err);
+    // Busy or missing camera: keep trying on our own (a blocked permission needs a person).
+    if(!(err&&err.name==="NotAllowedError")) camRetryT=setTimeout(()=>startCamera(), 3000);
+  } finally { camStarting=false; }
+}
+function cameraLive(){ const t=state.stream&&state.stream.getVideoTracks()[0]; return !!t && t.readyState==="live" && !camStarting && videoReady(); }
+function cameraLost(why){
+  if(camStarting) return;
+  window.__PB.cameraRestarts=(window.__PB.cameraRestarts||0)+1; window.__PB.cameraLost=why;
+  els.camErrorMsg.textContent="Reconnecting camera…"; els.camError.classList.add("show"); els.startBtn.disabled=true;
+  clearTimeout(camRetryT); camRetryT=setTimeout(()=>startCamera(), 600);
+}
+/* Watchdog: a live-looking track whose picture stopped moving (iOS interruptions, a
+   USB hub hiccup) or a track that ended without an event gets reconnected too. */
+let camVideoT=-1, camStallSince=0;
+setInterval(()=>{
+  if(document.visibilityState!=="visible" || camStarting || camLastErr) return;
+  const t=state.stream&&state.stream.getVideoTracks()[0];
+  if(!state.stream) return;
+  if(!t || t.readyState!=="live"){ cameraLost("track not live"); return; }
+  const now=els.video.currentTime;
+  if(now===camVideoT){ if(!camStallSince) camStallSince=Date.now(); else if(Date.now()-camStallSince>5000){ camStallSince=0; cameraLost("picture frozen"); } }
+  else { camVideoT=now; camStallSince=0; }
+}, 1000);
+navigator.mediaDevices && navigator.mediaDevices.addEventListener && navigator.mediaDevices.addEventListener("devicechange", ()=>{ if(camLastErr) startCamera(); });
+/* Before each shot: if the camera is reconnecting, wait for it (up to 15 s). */
+async function waitForCamera(ms){
+  if(cameraLive()) return true;
+  els.prompt.textContent="📷 One moment — camera reconnecting…"; els.prompt.classList.add("show");
+  const end=Date.now()+ms; while(Date.now()<end && !cameraLive()) await sleep(150);
+  els.prompt.classList.remove("show"); els.prompt.textContent="Smile! 📸";
+  return cameraLive();
 }
 function stopStream(){ if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); state.stream=null; } }
 function sizeProc(){ els.proc.width=els.video.videoWidth||1280; els.proc.height=els.video.videoHeight||720; }
@@ -464,11 +508,27 @@ function showCamError(err){
 
 /* ---------- 4) AI segmentation + compositing ------------------------------ */
 function startLoop(){ if(rafId) return; const step=()=>{ renderOnce().finally(()=>{ rafId=requestAnimationFrame(step); }); }; rafId=requestAnimationFrame(step); }
+let segBusySince=0;
 async function renderOnce(){
   if(!videoReady()) return;
   if(propsActive()) updateFaces();
-  if(state.aiOn && seg && segReady){ try { await seg.send({ image: els.video }); } catch(e){ window.__PB.error=String(e&&e.message||e); drawRaw(); } }
+  if(state.aiOn && seg && segReady){
+    // A stuck background model must not freeze the live picture (and with it every
+    // photo): after 1.5 s show the plain camera, after 6 s restart the model.
+    if(segBusySince){ drawRaw(); if(Date.now()-segBusySince>6000) resetSegmenter(); return; }
+    segBusySince=Date.now();
+    const inst=seg;
+    const p=Promise.resolve().then(()=>inst.send({ image: els.video })).then(()=>{ if(seg===inst) segBusySince=0; }, (e)=>{ if(seg===inst) segBusySince=0; window.__PB.error=String(e&&e.message||e); drawRaw(); });
+    await Promise.race([p, sleep(1500)]);
+  }
   else drawRaw();
+}
+let segResets=0;
+function resetSegmenter(){
+  const old=seg; seg=null; segReady=false; segBusySince=0; segResets++; window.__PB.segResets=segResets;
+  try { old && old.close && old.close(); } catch {}
+  if(segResets>3){ disableAI(); showToast("Background effect paused — tap ✨ to turn it back on."); return; }
+  initSegmenter().then(ok=>{ if(!ok){ disableAI(); showToast("Background effect paused — tap ✨ to turn it back on."); } });
 }
 function drawRaw(){
   const w=els.proc.width, h=els.proc.height, c=procCtx;
@@ -498,7 +558,9 @@ function drawBackground(c,image,w,h){
 function coverDraw(c,img,w,h){ const ir=img.width/img.height, r=w/h; let dw,dh,dx,dy; if(ir>r){ dh=h; dw=h*ir; dx=(w-dw)/2; dy=0; } else { dw=w; dh=w/ir; dx=0; dy=(h-dh)/2; } c.drawImage(img,dx,dy,dw,dh); }
 async function initSegmenter(){
   if(seg) return true; if(typeof SelfieSegmentation==="undefined") return false;
-  try { seg=new SelfieSegmentation({ locateFile:(f)=>`assets/mediapipe/${f}?v=${CONFIG.appVersion}` }); seg.setOptions({ modelSelection:CONFIG.ai.modelSelection, selfieMode:false }); seg.onResults(onSegResults); if(videoReady()) await seg.send({ image: els.video }); segReady=true; window.__PB.aiReady=true; return true; }
+  try { seg=new SelfieSegmentation({ locateFile:(f)=>`assets/mediapipe/${f}?v=${CONFIG.appVersion}` }); seg.setOptions({ modelSelection:CONFIG.ai.modelSelection, selfieMode:false }); seg.onResults(onSegResults);
+        if(videoReady()){ const warm=await Promise.race([seg.send({ image: els.video }).then(()=>true), sleep(20000).then(()=>false)]); if(!warm) throw new Error("model warm-up timed out"); }
+        segReady=true; window.__PB.aiReady=true; return true; }
   catch(e){ seg=null; segReady=false; return false; }
 }
 async function enableAI(){
@@ -725,6 +787,21 @@ function sfx(kind){
 }
 async function runSession(){
   if(state.busy || !state.stream) return;
+  try { await runSessionSteps(); }
+  catch(e){
+    // Whatever broke (a canvas, the encoder, storage), put the booth back in a
+    // state where the next guest can just press Start.
+    window.__PB.error=String(e&&e.message||e); window.__PB.sessionErrors=(window.__PB.sessionErrors||0)+1;
+    try { console.error("session failed", e); } catch {}
+    [els.getReady, els.countdown, els.prompt, els.review].forEach(el=>el&&el.classList.remove("show"));
+    els.prompt.textContent="Smile! 📸"; els.shotDots.classList.add("hidden");
+    if(window.__PB.review) window.__PB.review.open=false;
+    showToast("Sorry — that one didn't work. Tap Start to try again.");
+  } finally {
+    state.busy=false; setControlsEnabled(true); document.body.classList.remove("capturing");
+  }
+}
+async function runSessionSteps(){
   state.busy=true; setControlsEnabled(false); document.body.classList.add("capturing"); window.__PB.done=false; window.__PB.count=0;
   window.__PB.upload=null;   // stale status from the previous session must not leak into this one
   state.restyleChoice="none"; state.restyleMs=null; checkRestyle();   // refresh sidecar availability per session
@@ -751,21 +828,21 @@ async function runSession(){
   state.lastBoomerang=boom||null;
   window.__PB.done=true;
   if(url){
-    saveToGallery(url); setBoomResultUI(boom);
+    setBoomResultUI(boom);
     const boomDataUrl = boom ? await blobToDataURL(boom.blob) : null;
     const session=buildSession(shots, url, boomDataUrl);
+    saveToGallery(url, session.id);
     lastSession=session;
     showResult(url); resetPrintStatus();
-    uploadSession(session);   // Persist and upload while the next guest uses the booth
+    uploadSession(session).catch(e=>{ window.__PB.error=String(e&&e.message||e); });   // Persist and upload while the next guest uses the booth
   }
-  state.busy=false; setControlsEnabled(true); document.body.classList.remove("capturing");
 }
 async function countdown(seconds){
   for(let n=seconds;n>=1;n--){ els.countdown.textContent=n; els.countdown.classList.remove("show"); void els.countdown.offsetWidth; els.countdown.classList.add("show"); sfx("beep"); await sleep(TICK_MS); }
   els.countdown.classList.remove("show"); els.prompt.classList.add("show"); sfx("go"); await sleep(FAST?40:250); els.prompt.classList.remove("show");
 }
-async function flashAndGrab(shots){ els.flash.classList.remove("fire"); void els.flash.offsetWidth; els.flash.classList.add("fire"); sfx("shutter"); shots.push(grabFrame()); await sleep(FAST?40:220); }
-async function flashAndGrabInto(shots,i){ els.flash.classList.remove("fire"); void els.flash.offsetWidth; els.flash.classList.add("fire"); sfx("shutter"); shots[i]=grabFrame(); await sleep(FAST?40:220); }
+async function flashAndGrab(shots){ await waitForCamera(15000); els.flash.classList.remove("fire"); void els.flash.offsetWidth; els.flash.classList.add("fire"); sfx("shutter"); shots.push(grabFrame()); await sleep(FAST?40:220); }
+async function flashAndGrabInto(shots,i){ await waitForCamera(15000); els.flash.classList.remove("fire"); void els.flash.offsetWidth; els.flash.classList.add("fire"); sfx("shutter"); shots[i]=grabFrame(); await sleep(FAST?40:220); }
 
 /* ---------- 5a-pre) boomerang -------------------------------------------- */
 const blobToDataURL=(blob)=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(blob); });
@@ -962,6 +1039,7 @@ function buildSession(shots, stripUrl, boomDataUrl){
 }
 let lastUploadMap=null;
 const delivery = PBDelivery.create(CONFIG.collection, (record) => {
+  if(record.results?.cloud?.ok && record.results.cloud.strip) galleryCloud(record.id, record.results.cloud.strip);
   if(record.id!==lastSession?.id) return; // An older upload must not replace this guest's QR/status.
   lastUploadMap=record.results;
   const allOk=record.targets.every(k=>record.results[k]?.ok);
@@ -1102,9 +1180,23 @@ function composeStrip(shots, themeId, scale){
   ctx.fillText(F.upper===false?l1:l1.toUpperCase(), stripW/2, footerY+(F.serif?64:62));
   ctx.fillStyle=T.sub; ctx.font=(F.serif?"500 26px "+serifStack():"500 24px "+fontStack());
   ctx.fillText((F.l2!=null)?F.l2:(CONFIG.brandSubtitle||dateLabel()), stripW/2, footerY+102);
-  try { return c.toDataURL("image/png"); }
+  try { return fitDataUrl(c); }
   catch(e){ showToast("Export blocked — a cross-origin background tainted the canvas. Upload the image instead of using its URL."); return null; }
 }
+/* The cloud save and print endpoints take at most 12,000,000 characters per image.
+   A photographic 1200×3600 strip as PNG is ~10–12.5M (more in dim, grainy light), so
+   a busy strip could be refused — no QR, and no print, since printing waits for the
+   archive. Keep PNG when it fits comfortably; otherwise use near-lossless JPEG
+   (q 0.95 is ~2–4M and indistinguishable on a 4×6 print). */
+const IMAGE_CHAR_BUDGET=10_500_000;
+function fitDataUrl(c){
+  const png=c.toDataURL("image/png");
+  if(png.length<=IMAGE_CHAR_BUDGET) return png;
+  for(const q of [0.95,0.9,0.85,0.75]){ const jpg=c.toDataURL("image/jpeg",q); if(jpg.length<=IMAGE_CHAR_BUDGET) return jpg; }
+  return c.toDataURL("image/jpeg",0.6);
+}
+const dataUrlMime=(u)=>(/^data:([^;,]+)/.exec(u||"")||[])[1]||"image/png";
+const extFor=(u)=>dataUrlMime(u)==="image/jpeg"?"jpg":"png";
 /* PRINT SHEET: two identical strips side by side on a 4×6" sheet (1200×1800
    logical @300 DPI, exported at CONFIG.exportScale → 2400×3600 px). Print
    borderless on the Selphy, cut down the center → two 2×6 strips (keep one /
@@ -1127,7 +1219,7 @@ function composePrintSheet(stripUrl){
         ctx.drawImage(im, x0,      y0, w, h);                          // left strip
         ctx.drawImage(im, x0+w+G,  y0, w, h);                          // right strip
         if(CONFIG.printCutLine){ ctx.fillStyle="rgba(0,0,0,.12)"; ctx.fillRect(sheetW/2-0.5, y0, 1, h); }  // center cut guide
-        resolve(c.toDataURL("image/png"));
+        resolve(fitDataUrl(c));
       }catch(e){ reject(e); }
     };
     im.onerror=()=>reject(new Error("strip image failed to load"));
@@ -1166,21 +1258,48 @@ try { memGallery = JSON.parse(localStorage.getItem(STORE_KEY)||"[]"); } catch { 
    best-effort persistence. Big strips can exceed the ~5MB quota — before, a failed
    write left reads pinned to the last-saved copy, so only the FIRST strip showed.
    Now every strip stays in memory and shows, even when the write can't persist. */
-const store={ read(){ return memGallery; }, write(list){ memGallery=list; try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); } catch {} } };
-function saveToGallery(url){ const list=store.read(); list.unshift({url,t:Date.now()}); while(list.length>CONFIG.galleryMax) list.pop(); store.write(list); renderGallery(); }
+/* Memory: a full strip is ~10 MB as a data URL. Keeping 24 of them (plus their
+   decoded images) costs ~300-700 MB, enough for an iPad to kill the tab mid-party.
+   So the gallery shows small thumbnails, holds full-size copies only for the
+   newest few, and older tiles open the strip's cloud copy instead. Only
+   thumbnails go to localStorage. */
+const GALLERY_FULL_KEEP=3;
+const store={ read(){ return memGallery; }, write(list){ memGallery=list;
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(list.filter(x=>x.thumb).map(x=>({thumb:x.thumb,t:x.t,id:x.id,cloud:x.cloud})))); } catch {} } };
+memGallery=memGallery.filter(x=>x&&x.thumb).map(x=>({thumb:x.thumb,t:x.t,id:x.id,cloud:x.cloud}));   // old saves held full strips: drop them
+function stripThumb(url){
+  return new Promise((res)=>{ const im=new Image(); im.onload=()=>{ try { const w=200, h=Math.round(im.height*w/im.width); const c=document.createElement("canvas"); c.width=w; c.height=h; c.getContext("2d").drawImage(im,0,0,w,h); res(c.toDataURL("image/jpeg",0.75)); } catch { res(null); } }; im.onerror=()=>res(null); im.src=url; });
+}
+function saveToGallery(url, id){
+  const list=store.read(); const item={url,t:Date.now(),id:id||null,thumb:null,cloud:null};
+  list.unshift(item); while(list.length>CONFIG.galleryMax) list.pop();
+  list.forEach((x,i)=>{ if(i>=GALLERY_FULL_KEEP && x.thumb) x.url=null; });
+  store.write(list); renderGallery();
+  stripThumb(url).then(th=>{ if(!th) return; item.thumb=th; store.read().forEach((x,i)=>{ if(i>=GALLERY_FULL_KEEP && x.thumb) x.url=null; }); store.write(store.read()); renderGallery(); });
+}
+function galleryCloud(id, cloudUrl){ const it=store.read().find(x=>x.id&&x.id===id); if(it && cloudUrl && it.cloud!==cloudUrl){ it.cloud=cloudUrl; store.write(store.read()); } }
 function renderGallery(){
   const list=store.read(); els.clearGallery.style.display=list.length?"":"none";
   if(!list.length){ els.gallery.innerHTML='<div class="empty">Your strips will show up here.</div>'; return; }
   els.gallery.innerHTML="";
-  list.forEach((item,i)=>{ const div=document.createElement("div"); div.className="thumb"; div.innerHTML=`<img src="${item.url}" alt="strip ${i+1}" /><div class="dl">⬇ download</div>`; div.addEventListener("click",()=>downloadURL(item.url, stripFilename(item.t))); els.gallery.appendChild(div); });
+  list.forEach((item,i)=>{
+    const src=item.thumb||item.url; if(!src) return;
+    const div=document.createElement("div"); div.className="thumb";
+    const img=document.createElement("img"); img.src=src; img.alt="strip "+(i+1); img.decoding="async";
+    const dl=document.createElement("div"); dl.className="dl"; dl.textContent=item.url?"⬇ download":(item.cloud?"☁ open":"");
+    div.append(img, dl);
+    div.addEventListener("click",()=>{ const it=store.read().find(x=>x===item)||item;
+      if(it.url) downloadURL(it.url, stripFilename(it.t, it.url)); else if(it.cloud) window.open(it.cloud,"_blank","noopener"); else showToast("The full-size strip is in the cloud gallery."); });
+    els.gallery.appendChild(div);
+  });
 }
-function stripFilename(t){ const d=new Date(t||Date.now()), p=(x)=>String(x).padStart(2,"0"); return `photobooth_${state.lastStripTheme||state.stripTheme}_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.png`; }
+function stripFilename(t,url){ const d=new Date(t||Date.now()), p=(x)=>String(x).padStart(2,"0"); return `photobooth_${state.lastStripTheme||state.stripTheme}_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.${extFor(url)}`; }
 function downloadURL(url,filename){ const a=document.createElement("a"); a.href=url; a.download=filename||"photobooth.png"; document.body.appendChild(a); a.click(); a.remove(); }
 
 /* ---------- 8) UI helpers + events ---------------------------------------- */
 function buildShotDots(n){ els.shotDots.innerHTML=""; for(let i=0;i<n;i++){ const d=document.createElement("div"); d.className="dot"; els.shotDots.appendChild(d); } els.shotDots.classList.remove("hidden"); }
 function markShotDone(i){ const d=els.shotDots.children[i]; if(d) d.classList.add("done"); }
-function setControlsEnabled(on){ els.startBtn.disabled=!on||!state.stream; els.switchCam.disabled=!on; els.mirrorBtn.disabled=!on; els.bgToggle.disabled=!on; els.countSeg.querySelectorAll("button").forEach(b=>b.disabled=!on); setPropSegEnabled(on); }
+function setControlsEnabled(on){ els.startBtn.disabled=!on||!state.stream||els.camError.classList.contains("show"); els.switchCam.disabled=!on; els.mirrorBtn.disabled=!on; els.bgToggle.disabled=!on; els.countSeg.querySelectorAll("button").forEach(b=>b.disabled=!on); setPropSegEnabled(on); }
 function showResult(url){ els.stripPreview.src=url; if(els.closeResult) els.closeResult.style.display="none"; { const t=CONFIG.collection&&CONFIG.collection.target; if(CONFIG.collection&&CONFIG.collection.enabled&&(t==="cloud"||t==="both")) showStripQrLoading(); } els.result.classList.add("show"); document.querySelector("#resultCard").scrollTop=0; clearTimeout(state.resultTimer); state.resultTimer=setTimeout(()=>{ if(els.result.classList.contains("show")) hideResult(); }, 45000); clearTimeout(state.closeRevealTimer); state.closeRevealTimer=setTimeout(()=>{ if(els.closeResult) els.closeResult.style.display=""; }, 8000); }
 function setBoomResultUI(boom){
   const v=document.querySelector("#boomVid"); if(!v) return;
@@ -1220,18 +1339,18 @@ els.printBtn.addEventListener("click", enqueuePrint);
    AirDrop, Messages…) via the Web Share API; on desktop it downloads. */
 async function saveStrip(){
   const url=state.lastStripURL; if(!url) return;
-  const name=stripFilename();
+  const name=stripFilename(null, url);
   const touch = matchMedia("(pointer:coarse)").matches;
   try{
     if(touch && navigator.canShare){
       const blob=await (await fetch(url)).blob();
-      const file=new File([blob], name, {type:"image/png"});
+      const file=new File([blob], name, {type:dataUrlMime(url)});
       if(navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:"Photobooth strip"}); return; }
     }
   }catch(e){ if(e && e.name==="AbortError") return; /* user closed the sheet */ }
   downloadURL(url, name);
 }
-function printFilename(){ const d=new Date(), p=(x)=>String(x).padStart(2,"0"); return `LisaPete_printsheet_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.png`; }
+function printFilename(url){ const d=new Date(), p=(x)=>String(x).padStart(2,"0"); return `LisaPete_printsheet_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.${extFor(url)}`; }
 /* Save / hand-off path: build the 4×6 two-strip sheet, then share it (iOS share
    sheet → Canon SELPHY app, or Save to Photos) or download (desktop). */
 async function savePrintSheet(){
@@ -1240,11 +1359,11 @@ async function savePrintSheet(){
   if(btn){ btn.disabled=true; btn.textContent="🖨 Preparing…"; }
   try{
     const url=await composePrintSheet(state.lastStripURL);
-    const name=printFilename();
+    const name=printFilename(url);
     const touch=matchMedia("(pointer:coarse)").matches;
     if(touch && navigator.canShare){
       const blob=await (await fetch(url)).blob();
-      const file=new File([blob], name, {type:"image/png"});
+      const file=new File([blob], name, {type:dataUrlMime(url)});
       if(navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:"Photobooth print sheet"}); return; }
     }
     downloadURL(url, name);
@@ -1361,10 +1480,26 @@ document.addEventListener("keydown", (e)=>{
   else if(e.code==="Escape"){ hideResult(); }
 });
 
+/* ---------- keep the screen on; recover after the screen/app comes back ----- */
+async function keepAwake(){
+  try {
+    if(!("wakeLock" in navigator) || window.__PB.wakeLock || document.visibilityState!=="visible") return;
+    const lock=await navigator.wakeLock.request("screen"); window.__PB.wakeLock=lock;
+    lock.addEventListener("release", ()=>{ if(window.__PB.wakeLock===lock) window.__PB.wakeLock=null; });
+  } catch { /* not supported / not allowed yet: retried on the next tap */ }
+}
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState!=="visible") return;
+  keepAwake();
+  if(!camStarting && !camLastErr && !cameraLive()) cameraLost("came back");
+});
+document.addEventListener("pointerdown", keepAwake, { passive:true });
+window.addEventListener("unhandledrejection", (e)=>{ window.__PB.error=String(e.reason&&e.reason.message||e.reason); });
+
 /* ---------- boot ---------------------------------------------------------- */
 els.brandTitle.textContent=CONFIG.brandTitle; document.title=CONFIG.brandTitle+" · V"+CONFIG.appVersion;
 if(matchMedia("(pointer:coarse)").matches) els.downloadBtn.textContent="📤 Share photo";   // touch → share sheet
-applyMirror(); if(els.themeSel) els.themeSel.value=state.stripTheme; renderGallery(); preloadBackgrounds(); checkCollection(); checkRestyle(); startCamera();
+applyMirror(); if(els.themeSel) els.themeSel.value=state.stripTheme; renderGallery(); preloadBackgrounds(); checkCollection(); checkRestyle(); startCamera(); keepAwake();
 </script>
 </body>
 </html>
