@@ -2,11 +2,15 @@
 # Booth-day preflight. Run on the MacBook Air from the repo root:
 #   bash preflight.sh                 # read-only checks
 #   bash preflight.sh --print-test    # also prints ONE local test sheet (print-test-4x6.png)
-#                                     # straight to the SELPHY via lp; no cloud job is created
+#                                     # straight to EACH SELPHY via lp; no cloud job is created
 # Read-only otherwise: does not touch Supabase rows, the print queue, or the launch agent.
 set -u
 cd "$(dirname "$0")"
-PRINTER="${PRINTER:-$(/usr/libexec/PlistBuddy -c 'Print :EnvironmentVariables:PRINTER' "$HOME/Library/LaunchAgents/com.lisapete.printserver.plist" 2>/dev/null || echo Canon_SELPHY_CP1500)}"
+AGENT="$HOME/Library/LaunchAgents/com.lisapete.printserver.plist"
+# Which printers: PRINTER/PRINTERS env, else what the worker was installed with, else every SELPHY queue.
+PINNED="${PRINTERS:-${PRINTER:-$(/usr/libexec/PlistBuddy -c 'Print :EnvironmentVariables:PRINTERS' "$AGENT" 2>/dev/null || /usr/libexec/PlistBuddy -c 'Print :EnvironmentVariables:PRINTER' "$AGENT" 2>/dev/null || true)}}"
+if [ -n "$PINNED" ]; then PRINTER_LIST="$(echo "$PINNED" | tr ',' '\n')"
+else PRINTER_LIST="$(lpstat -p 2>/dev/null | awk '/^printer /{print $2}' | grep -i selphy || true)"; fi
 SB="https://xjnqnxorqhobikyzshrt.supabase.co"
 ANON="$(grep -oE 'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' printserver.js | head -1)"
 pass=0; fail=0; warn=0
@@ -29,11 +33,13 @@ br=$(git rev-parse --abbrev-ref HEAD); behind=$(git rev-list --count HEAD..origi
 [ "$behind" = "0" ] && ok "on $br, up to date with origin/main" || meh "on $br, $behind commit(s) behind origin/main — git pull"
 [ -z "$(git status --porcelain --untracked-files=no)" ] && ok "no uncommitted changes" || meh "uncommitted changes present (git status)"
 
+[ -z "$PRINTER_LIST" ] && { echo "== Printers"; bad "no SELPHY print queues — add each SELPHY in System Settings → Printers & Scanners (venue Wi-Fi). Queues:"; lpstat -p 2>/dev/null | sed 's/^/       /'; }
+for PRINTER in $PRINTER_LIST; do
 echo "== Printer ($PRINTER)"
 if lpstat -p "$PRINTER" >/dev/null 2>&1 || lpstat -c "$PRINTER" >/dev/null 2>&1; then
   ok "queue exists"
   st=$(lpstat -p "$PRINTER" 2>/dev/null | head -1)
-  echo "$st" | grep -qi disabled && bad "queue is disabled: $st — run: cupsenable $PRINTER" || ok "$st"
+  echo "$st" | grep -qi disabled && bad "queue is disabled: $st — fix paper/ink/jam, then run: cupsenable $PRINTER (or Resume on the admin page)" || ok "$st"
   lpstat -a "$PRINTER" 2>/dev/null | grep -qi "not accepting" && bad "queue not accepting jobs — run: cupsaccept $PRINTER" || ok "accepting jobs"
   q=$(lpstat -o "$PRINTER" 2>/dev/null | wc -l | tr -d ' ')
   [ "$q" = "0" ] && ok "no stuck macOS print jobs" || meh "$q job(s) waiting in the macOS queue (lpstat -o); check paper/ink"
@@ -42,12 +48,13 @@ if lpstat -p "$PRINTER" >/dev/null 2>&1 || lpstat -c "$PRINTER" >/dev/null 2>&1;
 else
   bad "no queue named $PRINTER. Available:"; lpstat -p 2>/dev/null | sed 's/^/       /'
 fi
+done
 
 echo "== Print worker"
 if launchctl print "gui/$(id -u)/com.lisapete.printserver" >/dev/null 2>&1; then
   pid=$(launchctl print "gui/$(id -u)/com.lisapete.printserver" | awk '/pid =/{print $3}')
   [ -n "$pid" ] && ok "launch agent running (pid $pid)" || bad "launch agent loaded but not running"
-else bad "launch agent not installed — run: bash install-printserver.sh $PRINTER"; fi
+else bad "launch agent not installed — run: bash install-printserver.sh"; fi
 n=$(pgrep -fl 'node .*printserver.js' | wc -l | tr -d ' ')
 [ "$n" -le 1 ] && ok "$n printserver process(es)" || bad "$n printserver processes — stop the extra manual one(s); only the launch agent should run"
 LOG="$HOME/Library/Logs/Photobooth/printserver.log"
@@ -65,10 +72,12 @@ code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' https://photobooth-c7s.pages
 [ "$code" = "200" ] && ok "booth site up" || bad "booth site HTTP $code"
 
 if [ "${1:-}" = "--print-test" ]; then
-  echo "== Test print"
-  if out=$(lp -d "$PRINTER" -o media=Postcard.Fullbleed print-test-4x6.png 2>&1); then
-    ok "submitted: $out — the red border should reach all four edges"
-  else bad "lp failed: $out"; fi
+  for PRINTER in $PRINTER_LIST; do
+    echo "== Test print ($PRINTER)"
+    if out=$(lp -d "$PRINTER" -o media=Postcard.Fullbleed print-test-4x6.png 2>&1); then
+      ok "submitted: $out — the red border should reach all four edges"
+    else bad "lp failed: $out"; fi
+  done
 fi
 
 echo; echo "Result: $pass ok, $warn warning(s), $fail problem(s)"

@@ -3,7 +3,9 @@
 set -euo pipefail
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
-PRINTER_NAME="${1:-Canon_SELPHY_CP1500}"
+# No argument: the worker finds every SELPHY queue itself (two printers → alternate,
+# switch modes from sternfishmanwedding.com/photos/admin). An argument pins one queue/class.
+PRINTER_NAME="${1:-auto}"
 NODE_PATH="$(command -v node || true)"
 if [ -z "$NODE_PATH" ]; then
   echo 'Install Node.js 22 or newer, then run this installer again.' >&2
@@ -13,7 +15,17 @@ if ! "$NODE_PATH" -e 'if (Number(process.versions.node.split(".")[0]) < 22) proc
   echo 'Node.js 22 or newer is required.' >&2
   exit 1
 fi
-if ! lpstat -p "$PRINTER_NAME" >/dev/null 2>&1 && ! lpstat -c "$PRINTER_NAME" >/dev/null 2>&1; then
+if [ "$PRINTER_NAME" = "auto" ]; then
+  FOUND="$(lpstat -p 2>/dev/null | awk '/^printer /{print $2}' | grep -i selphy || true)"
+  if [ -z "$FOUND" ]; then
+    echo "No SELPHY printer queues found. Add each SELPHY in System Settings → Printers & Scanners"
+    echo "(on the venue Wi-Fi), then run this installer again. Queues on this Mac:"
+    lpstat -p || true
+    exit 1
+  fi
+  echo "SELPHY printers found (the worker uses all of them):"
+  echo "$FOUND" | sed 's/^/  • /'
+elif ! lpstat -p "$PRINTER_NAME" >/dev/null 2>&1 && ! lpstat -c "$PRINTER_NAME" >/dev/null 2>&1; then
   echo "Printer '$PRINTER_NAME' was not found. Add the SELPHY in System Settings → Printers & Scanners."
   echo 'Available printer queue names:'
   lpstat -p || true
@@ -33,7 +45,7 @@ fs.writeFileSync(agent, `<?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0"><dict>
 <key>Label</key><string>com.lisapete.printserver</string>
 <key>ProgramArguments</key><array><string>${xml(node)}</string><string>${xml(repo)}/printserver.js</string></array>
-<key>EnvironmentVariables</key><dict><key>PRINTER</key><string>${xml(printer)}</string><key>PATH</key><string>/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+<key>EnvironmentVariables</key><dict>${printer === 'auto' ? '' : `<key>PRINTERS</key><string>${xml(printer)}</string>`}<key>PATH</key><string>/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
 <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
 <key>StandardOutPath</key><string>${xml(logs)}/printserver.log</string>
 <key>StandardErrorPath</key><string>${xml(logs)}/printserver.log</string>
@@ -42,5 +54,10 @@ NODE
 plutil -lint "$AGENT_PATH"
 launchctl bootout "gui/$(id -u)/com.lisapete.printserver" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$AGENT_PATH"
-echo "Print worker installed for $PRINTER_NAME. It starts at login and is running now."
+if [ "$PRINTER_NAME" = "auto" ]; then
+  echo "Print worker installed for all SELPHYs. It starts at login and is running now."
+  echo "Printer switch (alternate / only one / pause): sternfishmanwedding.com/photos/admin → Photobooth"
+else
+  echo "Print worker installed for $PRINTER_NAME only. It starts at login and is running now."
+fi
 echo "Log: $LOG_DIR/printserver.log"

@@ -160,3 +160,53 @@ test('a grainy, busy strip is encoded small enough for the cloud save and the pr
   assert.ok(r.strip <= 10_500_000, `strip ${r.strip}`);
   assert.ok(r.sheet <= 10_500_000, `print sheet ${r.sheet}`);
 });
+
+test('when the camera picture changes shape (iPad rotated) the photo canvas follows it', async t => {
+  const { page, capture } = await booth(t);
+  await page.evaluate(() => {
+    Object.defineProperty(els.video, 'videoWidth', { configurable: true, get: () => 480 });
+    Object.defineProperty(els.video, 'videoHeight', { configurable: true, get: () => 640 });
+  });
+  await page.waitForFunction(() => els.proc.width === 480 && els.proc.height === 640);
+  await capture();
+});
+
+test('the small Reset camera button on the camera view restarts the camera', async t => {
+  const { page, cameraLive, capture } = await booth(t);
+  const before = await page.evaluate(() => state.stream.id);
+  await page.click('#resetCam');
+  await page.waitForFunction(id => window.__PB.cameraResets === 1 && state.stream && state.stream.id !== id && !document.querySelector('#camError').classList.contains('show'), before);
+  assert.equal(await cameraLive(), true);
+  await capture();
+});
+
+test('Reset camera / Reload booth from the admin page run only when no guest is mid-session', async t => {
+  const context = await browser.newContext({ permissions: ['camera', 'screen-wake-lock'] });
+  t.after(() => context.close());
+  const ctl = { cam: 3, reload: 7, at: new Date().toISOString(), reports: [] };
+  await context.route('https://**/*', route => {
+    const url = route.request().url();
+    if (url.includes('/functions/v1/api')) {
+      const body = route.request().postDataJSON(); if (body.booth) ctl.reports.push(body.booth);
+      return route.fulfill({ json: { ok: true, printMode: 'alternate', cameraReset: { seq: ctl.cam, at: ctl.at }, reload: { seq: ctl.reload, at: ctl.at } } });
+    }
+    if (url.endsWith('/functions/v1/session')) { const b = route.request().postDataJSON(); return route.fulfill({ json: { ok: true, id: b.id, strip: 'https://example.test/s.png' } }); }
+    return route.abort();
+  });
+  const page = await context.newPage();
+  await page.goto(`${origin}/?fast=1&collect=cloud&control=1`);
+  await page.waitForFunction(() => window.__PB?.ready);
+  await page.waitForFunction(() => remote.cam === 3);                      // existing commands are not replayed
+  assert.equal(await page.evaluate(() => window.__PB.cameraResets || 0), 0);
+  assert.ok(ctl.reports.length >= 1 && ctl.reports[0].version, 'booth reports its status');
+  await page.click('#startBtn');                                           // a guest starts a session…
+  ctl.cam = 4; ctl.at = new Date().toISOString();                          // …and someone presses Reset camera
+  await page.evaluate(() => pollControl());
+  assert.equal(await page.evaluate(() => window.__PB.cameraResets || 0), 0, 'not during a session');
+  await page.waitForFunction(() => window.__PB.done);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => window.__PB.cameraResets === 1 && window.__PB.cameraResetWhy === 'admin page', null, { timeout: 15000 });
+  ctl.reload = 8; ctl.at = new Date().toISOString();
+  await page.waitForFunction(() => !state.busy);
+  await Promise.all([page.waitForEvent('load', { timeout: 15000 }), page.evaluate(() => pollControl())]);
+});
