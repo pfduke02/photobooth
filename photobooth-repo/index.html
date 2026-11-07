@@ -78,6 +78,9 @@
   #rvBoomLbl { display:none; color:#cfd3e0; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
 
   #controls { margin-top:14px; display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; }
+  #resetCam { position:absolute; left:12px; bottom:12px; z-index:7; font:600 12px/1 system-ui,sans-serif; color:#fff; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.25); border-radius:999px; padding:9px 12px; opacity:.55; cursor:pointer; }
+  #resetCam:hover, #resetCam:focus-visible { opacity:1; }
+  body.capturing #resetCam { display:none; }
   #startBtn { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:6; font-size:clamp(20px,3.4vw,30px); padding:20px 46px; border-radius:16px; }
   #startBtn:disabled { opacity:0; pointer-events:none; }
   .ctlGroup { display:none; }   /* simplified: no Background / Props chooser for guests */
@@ -162,6 +165,7 @@
         <div id="prompt">Smile! 📸</div>
         <div id="flash"></div>
         <button class="btn primary" id="startBtn" disabled>📸 Start</button>
+        <button id="resetCam" type="button" aria-label="Reset camera" title="Reset camera — fixes a sideways, stretched or blurry picture">⟳ camera</button>
         <div id="camError">
           <div class="big">📷</div>
           <div id="camErrorMsg">Camera not available.</div>
@@ -340,7 +344,10 @@ const CONFIG = {
   // the cloud copy, and the gallery all carry the restyled frame with zero
   // contract changes. Capture NEVER depends on the sidecar.
   restyle:{ enabled:true, endpoint:"http://127.0.0.1:8123", timeoutMs:15000 },
-  appVersion:"2.4.3",
+  appVersion:"2.5.0",
+  // Remote control from the wedding admin page (sternfishmanwedding.com/photos/admin):
+  // "Reset camera" / "Reload booth" buttons, and this booth's status shown there.
+  control:{ endpoint:"https://hseupjbneifqxaykxltt.supabase.co/functions/v1/api", event:"bf4d479a7b1c16d5b088ede0", everyMs:10000 },
   strip:{ bg:"#ffffff", frame:"#111111", accent:"#c98a6b", text:"#111111", sub:"#8a8a8a" },
   galleryMax:24,
 };
@@ -405,7 +412,7 @@ const els = {
   startBtn:$("#startBtn"), switchCam:$("#switchCam"), bgToggle:$("#bgToggle"),
   mirrorBtn:$("#mirrorBtn"), countSeg:$("#countSeg"), collState:$("#collState"), themeSel:$("#themeSel"),
   bgTray:$("#bgTray"), bgChips:$("#bgChips"), bgUrl:$("#bgUrl"), bgUrlBtn:$("#bgUrlBtn"),
-  camError:$("#camError"), camErrorMsg:$("#camErrorMsg"), retryCam:$("#retryCam"),
+  camError:$("#camError"), camErrorMsg:$("#camErrorMsg"), retryCam:$("#retryCam"), resetCam:$("#resetCam"),
   review:$("#review"), rvThumbs:$("#rvThumbs"), rvOk:$("#rvOk"),
   gallery:$("#gallery"), clearGallery:$("#clearGallery"),
   result:$("#result"), stripPreview:$("#stripPreview"), uploadStatus:$("#uploadStatus"),
@@ -511,6 +518,9 @@ function startLoop(){ if(rafId) return; const step=()=>{ renderOnce().finally(()
 let segBusySince=0;
 async function renderOnce(){
   if(!videoReady()) return;
+  // iPad rotated / camera renegotiated: the picture changed shape, so the canvas must too
+  // (otherwise every photo comes out stretched or squashed).
+  if(els.video.videoWidth!==els.proc.width || els.video.videoHeight!==els.proc.height){ sizeProc(); window.__PB.resized=(window.__PB.resized||0)+1; }
   if(propsActive()) updateFaces();
   if(state.aiOn && seg && segReady){
     // A stuck background model must not freeze the live picture (and with it every
@@ -1480,6 +1490,47 @@ document.addEventListener("keydown", (e)=>{
   else if(e.code==="Escape"){ hideResult(); }
 });
 
+/* ---------- reset camera: the small ⟳ button on the camera view, or from the admin page ---------- */
+async function resetCamera(why){
+  window.__PB.cameraResets=(window.__PB.cameraResets||0)+1; window.__PB.cameraResetWhy=why||"button";
+  camLastErr=null; clearTimeout(camRetryT);
+  els.camErrorMsg.textContent="Restarting camera…"; els.camError.classList.add("show"); els.startBtn.disabled=true;
+  stopStream(); els.video.srcObject=null;
+  await sleep(400);
+  await startCamera();
+  if(cameraLive()) showToast("Camera restarted.");
+}
+els.resetCam.addEventListener("click", ()=>{ if(!state.busy) resetCamera("button"); });
+/* Poll the admin page's commands; report this booth's health so the admin page can show it. */
+const remote={ cam:null, reload:null, pendingCam:false, pendingReload:false, started:Date.now() };
+async function pollControl(){
+  const C=CONFIG.control; if(!C||!C.endpoint||FAST&&!new URLSearchParams(location.search).has("control")) return;
+  try{
+    const booth={ version:CONFIG.appVersion, camera:cameraLive()?"ok":(els.camError.classList.contains("show")?els.camErrorMsg.textContent:"not ready"),
+      busy:!!state.busy, ai:!!state.aiOn, bg:state.aiOn?state.currentBg.id:"none", pending:(document.querySelector("#pendingDelivery").textContent||"").slice(0,80),
+      resets:window.__PB.cameraResets||0, reconnects:window.__PB.cameraRestarts||0, errors:window.__PB.sessionErrors||0,
+      lastError:String(window.__PB.error||"").slice(0,160), upMin:Math.round((Date.now()-remote.started)/60000),
+      screen:[screen.width,screen.height], video:[els.video.videoWidth,els.video.videoHeight], ua:navigator.userAgent.slice(0,120) };
+    const r=await fetch(C.endpoint,{ method:"POST", headers:{"Content-Type":"application/json"}, signal:AbortSignal.timeout(8000),
+      body:JSON.stringify({ e:C.event, action:"booth_config", boothKey:CONFIG.collection.cloud.boothKey, booth }) });
+    const d=await r.json(); if(!d||!d.ok) return;
+    const fresh=(x)=>x && x.at && Date.now()-Date.parse(x.at)<5*60000;
+    // The first answer only records where the counters are; later increases are commands.
+    if(remote.cam===null){ remote.cam=d.cameraReset?.seq||0; remote.reload=d.reload?.seq||0; return; }
+    if((d.cameraReset?.seq||0)>remote.cam){ remote.cam=d.cameraReset.seq; if(fresh(d.cameraReset)) remote.pendingCam=true; }
+    if((d.reload?.seq||0)>remote.reload){ remote.reload=d.reload.seq; if(fresh(d.reload)) remote.pendingReload=true; }
+  }catch{ /* offline: the booth runs on its own */ }
+  runRemote();
+}
+function runRemote(){
+  // Never interrupt a guest: wait until the booth is idle and the result screen is closed.
+  const idle=!state.busy && !els.result.classList.contains("show");
+  if(remote.pendingReload && idle){ remote.pendingReload=false; location.reload(); return; }
+  if(remote.pendingCam && idle){ remote.pendingCam=false; resetCamera("admin page"); }
+}
+setInterval(pollControl, (CONFIG.control&&CONFIG.control.everyMs)||10000);
+setInterval(runRemote, 2000);
+
 /* ---------- keep the screen on; recover after the screen/app comes back ----- */
 async function keepAwake(){
   try {
@@ -1499,7 +1550,7 @@ window.addEventListener("unhandledrejection", (e)=>{ window.__PB.error=String(e.
 /* ---------- boot ---------------------------------------------------------- */
 els.brandTitle.textContent=CONFIG.brandTitle; document.title=CONFIG.brandTitle+" · V"+CONFIG.appVersion;
 if(matchMedia("(pointer:coarse)").matches) els.downloadBtn.textContent="📤 Share photo";   // touch → share sheet
-applyMirror(); if(els.themeSel) els.themeSel.value=state.stripTheme; renderGallery(); preloadBackgrounds(); checkCollection(); checkRestyle(); startCamera(); keepAwake();
+applyMirror(); if(els.themeSel) els.themeSel.value=state.stripTheme; renderGallery(); preloadBackgrounds(); checkCollection(); checkRestyle(); startCamera(); keepAwake(); setTimeout(pollControl, 1500);
 </script>
 </body>
 </html>
