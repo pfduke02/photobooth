@@ -26,11 +26,9 @@ minutes (log: `sync.log`); it also keeps a flat `strips/` folder (every strip
 as one PNG) and copies strips into a local **Google Drive** "Photobooth
 Strips" folder when Drive for desktop is installed.
 
-**Updating the live site** (git-connected): replace the `photobooth-repo/`
-folder in **github.com/pfduke02/photobooth** with the new unzipped
-`photobooth-repo` (GitHub → Add file → Upload files → drag the folder →
-Commit). Cloudflare Pages auto-builds from `main` (build output directory
-`photobooth-repo`).
+**Updating the live site** (git-connected): run `./deploy.sh` from the repo
+root — it commits and pushes to `main`, and Cloudflare Pages auto-builds from
+`main` (build output directory `photobooth-repo`).
 
 **V1.2:** simplified guest UI — Background is the only choice; 4 shots fixed
 (shots/mirror/theme choosers hidden, each a one-line restore).
@@ -163,7 +161,7 @@ The repo is the deploy source — every push to `main` auto-deploys:
 2. **dash.cloudflare.com → Workers & Pages → Create → Pages → Connect to Git**,
    authorize GitHub, pick `pfduke02/photobooth`.
 3. Build settings: Framework preset **None**, build command **empty**, build
-   output directory **`/`** → Deploy.
+   output directory **`photobooth-repo`** → Deploy.
 4. You get `https://<name>.pages.dev` — HTTPS, so the camera works. On a hosted
    URL the app auto-switches to **cloud-only** collection (no local server
    there); uploads go to Supabase, the gallery reads from it anywhere, and the
@@ -201,3 +199,7 @@ Phase 2B stretch — swap a diffusion img2img (Stable Diffusion / ControlNet)
 into the same `/restyle` endpoint; gallery text search; printing (strips are
 already print-true 2×6" @300dpi). Central Park backdrop still needs the photo
 file. See `ROADMAP.md`.
+
+## Reliable archive + SELPHY printing
+
+The result screen now tracks Supabase saving separately from the Mac print queue. Pending uploads/print requests survive reloads in IndexedDB; retries reuse the same IDs. Print waits for the strip's cloud archive, then requests one 4×6 sheet. The on-site Mac worker must be running. See the repository-root README for MacBook Air installation, release order, and automated tests (`npm test` from the root).

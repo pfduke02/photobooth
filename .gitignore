@@ -1,3 +1,32 @@
-printserver.log
-.DS_Store
+# --- Guest data: NEVER commit. This repo is public and photobooth-repo/ is the
+# --- live Cloudflare Pages site, so anything committed there is published.
+sessions/
+strips/
+prints/
+
+# Restyle sidecar models (auto-downloaded, ~7 MB each)
+models/
+
+# Test / screenshot output
+/photobooth-repo/*.png
+/photobooth-repo/*.jpg
+test-results/
+playwright-report/
+
+# Logs
+*.log
+
+# Python / Node
+__pycache__/
+*.pyc
+.venv/
+venv/
 node_modules/
+
+# Secrets / local config
+.env
+.env.*
+.dev.vars
+
+# macOS
+.DS_Store

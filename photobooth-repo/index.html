@@ -127,8 +127,8 @@
 
   #result { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(4,5,8,.82); backdrop-filter:blur(6px); z-index:20; padding:20px; }
   #result.show { display:flex; }
-  #resultCard { background:var(--panel); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); max-width:92vw; max-height:92vh; display:flex; gap:22px; align-items:center; }
-  @media (max-width:700px){ #resultCard{ flex-direction:column; } }
+  #resultCard { background:var(--panel); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); max-width:92vw; max-height:calc(100dvh - 40px); display:flex; gap:22px; align-items:flex-start; overflow-y:auto; overscroll-behavior:contain; }
+  @media (max-width:700px){ #resultCard{ flex-direction:column; align-items:center; } #resultCard #stripPreview{ max-height:35vh; flex-shrink:0; } #resultCard #resultActions{ width:100%; flex-shrink:0; } }
   #stripPreview { max-height:74vh; border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,.5); }
   #resultActions { display:flex; flex-direction:column; gap:12px; min-width:250px; }
   #resultActions h3 { margin:0 0 4px; font-size:18px; }
@@ -147,7 +147,7 @@
 <body>
   <header>
     <h1 id="brandTitle">Photobooth</h1>
-    <p id="brandSub">V2.4 · booth · AI props + restyle · cloud + local collection · gallery</p>
+    <p id="brandSub">V2.4.2 · booth · AI props + restyle · cloud + local collection · gallery</p>
   </header>
 
   <main>
@@ -225,6 +225,7 @@
         <button class="btn ghost sm" id="galleryLink" title="Browse saved sessions">🖼 Gallery</button>
         <button class="btn ghost sm" id="qrBtn" title="QR code for this page">📱 QR</button>
         <button class="btn ghost sm" id="switchCam" style="display:none">⇆ Camera</button>
+        <span id="pendingDelivery" class="hint" aria-live="polite"></span>
         <span id="collState" class="hint" title="Where sessions are being saved">● collection: …</span>
       </div>
 
@@ -254,7 +255,8 @@
           <button class="btn primary big" id="printBtn">🖨 Print</button>
           <button class="btn primary big" id="againBtn">↺ Redo</button>
         </div>
-        <p id="uploadStatus" class="ustat"></p>
+        <p id="uploadStatus" class="ustat" aria-live="polite"></p>
+        <p id="printStatus" class="ustat" aria-live="polite"></p>
         <div id="stripQr" style="display:none; text-align:center; background:#fff; border-radius:14px; padding:14px; margin:2px 0 8px;">
           <img id="stripQrImg" alt="QR code for this strip" style="width:210px; height:210px; image-rendering:pixelated; display:block; margin:0 auto;" />
           <div id="stripQrCap" style="font:700 14px var(--font); color:#222; margin-top:8px;">📱 Scan to get your photos on your phone</div>
@@ -272,6 +274,7 @@
   <!-- ?v= busts any stale immutable-cached copy (early deploys served missing
        asset paths as index.html with 200 + our immutable header — Chrome then
        kept executing cached HTML as JS until the URL changed). Bump with appVersion. -->
+  <script src="assets/delivery.js?v=2.4.2"></script>
   <script src="assets/qrcode.js?v=2.4"></script>
   <script src="assets/mediapipe/selfie_segmentation.js?v=2.4"></script>
 <script>
@@ -337,7 +340,7 @@ const CONFIG = {
   // the cloud copy, and the gallery all carry the restyled frame with zero
   // contract changes. Capture NEVER depends on the sidecar.
   restyle:{ enabled:true, endpoint:"http://127.0.0.1:8123", timeoutMs:15000 },
-  appVersion:"2.4",
+  appVersion:"2.4.3",
   strip:{ bg:"#ffffff", frame:"#111111", accent:"#c98a6b", text:"#111111", sub:"#8a8a8a" },
   galleryMax:24,
 };
@@ -430,18 +433,62 @@ window.__PB = { ready:false, aiReady:false, done:false, count:0, lastStrip:null,
                 setProp:(id)=>selectProp(id) };
 
 /* ---------- 3) camera ----------------------------------------------------- */
+let camStarting=false, camRetryT=null, camLastErr=null;
 async function startCamera(deviceId=null){
+  if(camStarting) return;
+  camStarting=true; clearTimeout(camRetryT);
+  if(deviceId) state.camDeviceId=deviceId;
+  const want=deviceId||state.camDeviceId||null;
   stopStream();
-  const constraints = { audio:false, video: deviceId ? { deviceId:{ exact:deviceId } } : { facingMode:"user", width:{ideal:1280}, height:{ideal:720} } };
+  const constraints = { audio:false, video: want ? { deviceId:{ exact:want } } : { facingMode:"user", width:{ideal:1280}, height:{ideal:720} } };
   try {
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia(constraints); }
+    catch(e){ if(!want || e.name==="NotAllowedError") throw e; state.camDeviceId=null;   // that camera is gone: take any camera
+      stream = await navigator.mediaDevices.getUserMedia({ audio:false, video:{ facingMode:"user", width:{ideal:1280}, height:{ideal:720} } }); }
     state.stream = stream; els.video.srcObject = stream;
+    // A webcam cable bumped, the iPad camera taken by another app, the laptop lid shut:
+    // the track ends. Reconnect instead of letting guests photograph a frozen frame.
+    stream.getVideoTracks().forEach(t=>t.addEventListener("ended", ()=>{ if(state.stream===stream) cameraLost("ended"); }));
     await els.video.play().catch(()=>{});
     await new Promise((r)=>{ if(els.video.videoWidth) return r(); els.video.onloadedmetadata=()=>r(); setTimeout(r,1500); });
     sizeProc();
-    els.camError.classList.remove("show"); els.startBtn.disabled=false; window.__PB.ready=true;
+    camLastErr=null; camVideoT=-1; camStallSince=0;
+    els.camError.classList.remove("show"); els.startBtn.disabled=state.busy; window.__PB.ready=true; window.__PB.cameraRestarts=(window.__PB.cameraRestarts||0);
     startLoop(); await enumerateCameras();
-  } catch(err){ showCamError(err); }
+  } catch(err){
+    camLastErr=err; showCamError(err);
+    // Busy or missing camera: keep trying on our own (a blocked permission needs a person).
+    if(!(err&&err.name==="NotAllowedError")) camRetryT=setTimeout(()=>startCamera(), 3000);
+  } finally { camStarting=false; }
+}
+function cameraLive(){ const t=state.stream&&state.stream.getVideoTracks()[0]; return !!t && t.readyState==="live" && !camStarting && videoReady(); }
+function cameraLost(why){
+  if(camStarting) return;
+  window.__PB.cameraRestarts=(window.__PB.cameraRestarts||0)+1; window.__PB.cameraLost=why;
+  els.camErrorMsg.textContent="Reconnecting camera…"; els.camError.classList.add("show"); els.startBtn.disabled=true;
+  clearTimeout(camRetryT); camRetryT=setTimeout(()=>startCamera(), 600);
+}
+/* Watchdog: a live-looking track whose picture stopped moving (iOS interruptions, a
+   USB hub hiccup) or a track that ended without an event gets reconnected too. */
+let camVideoT=-1, camStallSince=0;
+setInterval(()=>{
+  if(document.visibilityState!=="visible" || camStarting || camLastErr) return;
+  const t=state.stream&&state.stream.getVideoTracks()[0];
+  if(!state.stream) return;
+  if(!t || t.readyState!=="live"){ cameraLost("track not live"); return; }
+  const now=els.video.currentTime;
+  if(now===camVideoT){ if(!camStallSince) camStallSince=Date.now(); else if(Date.now()-camStallSince>5000){ camStallSince=0; cameraLost("picture frozen"); } }
+  else { camVideoT=now; camStallSince=0; }
+}, 1000);
+navigator.mediaDevices && navigator.mediaDevices.addEventListener && navigator.mediaDevices.addEventListener("devicechange", ()=>{ if(camLastErr) startCamera(); });
+/* Before each shot: if the camera is reconnecting, wait for it (up to 15 s). */
+async function waitForCamera(ms){
+  if(cameraLive()) return true;
+  els.prompt.textContent="📷 One moment — camera reconnecting…"; els.prompt.classList.add("show");
+  const end=Date.now()+ms; while(Date.now()<end && !cameraLive()) await sleep(150);
+  els.prompt.classList.remove("show"); els.prompt.textContent="Smile! 📸";
+  return cameraLive();
 }
 function stopStream(){ if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); state.stream=null; } }
 function sizeProc(){ els.proc.width=els.video.videoWidth||1280; els.proc.height=els.video.videoHeight||720; }
@@ -461,11 +508,27 @@ function showCamError(err){
 
 /* ---------- 4) AI segmentation + compositing ------------------------------ */
 function startLoop(){ if(rafId) return; const step=()=>{ renderOnce().finally(()=>{ rafId=requestAnimationFrame(step); }); }; rafId=requestAnimationFrame(step); }
+let segBusySince=0;
 async function renderOnce(){
   if(!videoReady()) return;
   if(propsActive()) updateFaces();
-  if(state.aiOn && seg && segReady){ try { await seg.send({ image: els.video }); } catch(e){ window.__PB.error=String(e&&e.message||e); drawRaw(); } }
+  if(state.aiOn && seg && segReady){
+    // A stuck background model must not freeze the live picture (and with it every
+    // photo): after 1.5 s show the plain camera, after 6 s restart the model.
+    if(segBusySince){ drawRaw(); if(Date.now()-segBusySince>6000) resetSegmenter(); return; }
+    segBusySince=Date.now();
+    const inst=seg;
+    const p=Promise.resolve().then(()=>inst.send({ image: els.video })).then(()=>{ if(seg===inst) segBusySince=0; }, (e)=>{ if(seg===inst) segBusySince=0; window.__PB.error=String(e&&e.message||e); drawRaw(); });
+    await Promise.race([p, sleep(1500)]);
+  }
   else drawRaw();
+}
+let segResets=0;
+function resetSegmenter(){
+  const old=seg; seg=null; segReady=false; segBusySince=0; segResets++; window.__PB.segResets=segResets;
+  try { old && old.close && old.close(); } catch {}
+  if(segResets>3){ disableAI(); showToast("Background effect paused — tap ✨ to turn it back on."); return; }
+  initSegmenter().then(ok=>{ if(!ok){ disableAI(); showToast("Background effect paused — tap ✨ to turn it back on."); } });
 }
 function drawRaw(){
   const w=els.proc.width, h=els.proc.height, c=procCtx;
@@ -495,7 +558,9 @@ function drawBackground(c,image,w,h){
 function coverDraw(c,img,w,h){ const ir=img.width/img.height, r=w/h; let dw,dh,dx,dy; if(ir>r){ dh=h; dw=h*ir; dx=(w-dw)/2; dy=0; } else { dw=w; dh=w/ir; dx=0; dy=(h-dh)/2; } c.drawImage(img,dx,dy,dw,dh); }
 async function initSegmenter(){
   if(seg) return true; if(typeof SelfieSegmentation==="undefined") return false;
-  try { seg=new SelfieSegmentation({ locateFile:(f)=>`assets/mediapipe/${f}?v=${CONFIG.appVersion}` }); seg.setOptions({ modelSelection:CONFIG.ai.modelSelection, selfieMode:false }); seg.onResults(onSegResults); if(videoReady()) await seg.send({ image: els.video }); segReady=true; window.__PB.aiReady=true; return true; }
+  try { seg=new SelfieSegmentation({ locateFile:(f)=>`assets/mediapipe/${f}?v=${CONFIG.appVersion}` }); seg.setOptions({ modelSelection:CONFIG.ai.modelSelection, selfieMode:false }); seg.onResults(onSegResults);
+        if(videoReady()){ const warm=await Promise.race([seg.send({ image: els.video }).then(()=>true), sleep(20000).then(()=>false)]); if(!warm) throw new Error("model warm-up timed out"); }
+        segReady=true; window.__PB.aiReady=true; return true; }
   catch(e){ seg=null; segReady=false; return false; }
 }
 async function enableAI(){
@@ -722,6 +787,21 @@ function sfx(kind){
 }
 async function runSession(){
   if(state.busy || !state.stream) return;
+  try { await runSessionSteps(); }
+  catch(e){
+    // Whatever broke (a canvas, the encoder, storage), put the booth back in a
+    // state where the next guest can just press Start.
+    window.__PB.error=String(e&&e.message||e); window.__PB.sessionErrors=(window.__PB.sessionErrors||0)+1;
+    try { console.error("session failed", e); } catch {}
+    [els.getReady, els.countdown, els.prompt, els.review].forEach(el=>el&&el.classList.remove("show"));
+    els.prompt.textContent="Smile! 📸"; els.shotDots.classList.add("hidden");
+    if(window.__PB.review) window.__PB.review.open=false;
+    showToast("Sorry — that one didn't work. Tap Start to try again.");
+  } finally {
+    state.busy=false; setControlsEnabled(true); document.body.classList.remove("capturing");
+  }
+}
+async function runSessionSteps(){
   state.busy=true; setControlsEnabled(false); document.body.classList.add("capturing"); window.__PB.done=false; window.__PB.count=0;
   window.__PB.upload=null;   // stale status from the previous session must not leak into this one
   state.restyleChoice="none"; state.restyleMs=null; checkRestyle();   // refresh sidecar availability per session
@@ -748,18 +828,21 @@ async function runSession(){
   state.lastBoomerang=boom||null;
   window.__PB.done=true;
   if(url){
-    saveToGallery(url); showResult(url); setBoomResultUI(boom);
+    setBoomResultUI(boom);
     const boomDataUrl = boom ? await blobToDataURL(boom.blob) : null;
-    uploadSession(buildSession(shots, url, boomDataUrl));   // COLLECTION: background upload — never blocks capture
+    const session=buildSession(shots, url, boomDataUrl);
+    saveToGallery(url, session.id);
+    lastSession=session;
+    showResult(url); resetPrintStatus();
+    uploadSession(session).catch(e=>{ window.__PB.error=String(e&&e.message||e); });   // Persist and upload while the next guest uses the booth
   }
-  state.busy=false; setControlsEnabled(true); document.body.classList.remove("capturing");
 }
 async function countdown(seconds){
   for(let n=seconds;n>=1;n--){ els.countdown.textContent=n; els.countdown.classList.remove("show"); void els.countdown.offsetWidth; els.countdown.classList.add("show"); sfx("beep"); await sleep(TICK_MS); }
   els.countdown.classList.remove("show"); els.prompt.classList.add("show"); sfx("go"); await sleep(FAST?40:250); els.prompt.classList.remove("show");
 }
-async function flashAndGrab(shots){ els.flash.classList.remove("fire"); void els.flash.offsetWidth; els.flash.classList.add("fire"); sfx("shutter"); shots.push(grabFrame()); await sleep(FAST?40:220); }
-async function flashAndGrabInto(shots,i){ els.flash.classList.remove("fire"); void els.flash.offsetWidth; els.flash.classList.add("fire"); sfx("shutter"); shots[i]=grabFrame(); await sleep(FAST?40:220); }
+async function flashAndGrab(shots){ await waitForCamera(15000); els.flash.classList.remove("fire"); void els.flash.offsetWidth; els.flash.classList.add("fire"); sfx("shutter"); shots.push(grabFrame()); await sleep(FAST?40:220); }
+async function flashAndGrabInto(shots,i){ await waitForCamera(15000); els.flash.classList.remove("fire"); void els.flash.offsetWidth; els.flash.classList.add("fire"); sfx("shutter"); shots[i]=grabFrame(); await sleep(FAST?40:220); }
 
 /* ---------- 5a-pre) boomerang -------------------------------------------- */
 const blobToDataURL=(blob)=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(blob); });
@@ -943,7 +1026,7 @@ function buildSession(shots, stripUrl, boomDataUrl){
   let frames=[];
   try { frames = shots.map(cv=>cv.toDataURL("image/jpeg", CONFIG.collection.jpegQuality)); } catch(e){ frames=[]; }
   return {
-    createdAt:new Date().toISOString(), numPhotos:shots.length, strip:stripUrl, frames,
+    id:PBDelivery.newId(), createdAt:new Date().toISOString(), numPhotos:shots.length, strip:stripUrl, frames,
     boomerang: boomDataUrl||undefined,
     meta:{ version:CONFIG.appVersion, mirror:state.mirror, aiEnabled:state.aiOn, stripTheme:state.stripTheme,
            background: state.aiOn ? state.currentBg.id : "none",
@@ -954,40 +1037,34 @@ function buildSession(shots, stripUrl, boomDataUrl){
            client:{ userAgent:navigator.userAgent, viewport:[window.innerWidth,window.innerHeight], dpr:window.devicePixelRatio||1 } },
   };
 }
-// POST the session to one destination ("local" or "cloud"); never throws.
-async function postOne(kind, session){
-  const C=CONFIG.collection;
-  const endpoint = kind==="cloud" ? C.cloud.endpoint : C.local.endpoint;
-  const headers = { "Content-Type":"application/json" };
-  if(kind==="cloud"){ headers["apikey"]=C.cloud.anonKey; headers["Authorization"]="Bearer "+C.cloud.anonKey; headers["x-booth-key"]=C.cloud.boothKey; }
-  try {
-    const res=await fetch(endpoint,{ method:"POST", headers, body:JSON.stringify(session) });
-    if(!res.ok) throw new Error("HTTP "+res.status);
-    const data=await res.json(); if(!data.ok) throw new Error(data.error||"server error");
-    return { kind, ok:true, id:data.id, strip:data.strip||null };   // cloud returns the strip's public URL
-  } catch(e){ return { kind, ok:false, error:String(e.message||e) }; }
-}
-// Fire the upload(s) in the background. "both" writes local AND cloud in
-// parallel; capture never waits on either, and one failing doesn't lose the
-// other. Retry re-sends ONLY the failed destination(s) — no duplicates.
 let lastUploadMap=null;
-async function uploadSession(session, onlyTargets){
+const delivery = PBDelivery.create(CONFIG.collection, (record) => {
+  if(record.results?.cloud?.ok && record.results.cloud.strip) galleryCloud(record.id, record.results.cloud.strip);
+  if(record.id!==lastSession?.id) return; // An older upload must not replace this guest's QR/status.
+  lastUploadMap=record.results;
+  const allOk=record.targets.every(k=>record.results[k]?.ok);
+  const anyOk=record.targets.some(k=>record.results[k]?.ok);
+  const status=allOk?"saved":anyOk?"partial":record.sending?"uploading":"failed";
+  const id=record.results.cloud?.id||record.results.local?.id||null;
+  window.__PB.upload={status,id,targets:record.results};
+  setUploadStatus(status,id,record.results,record.targets);
+  if(!record.durable && !allOk) els.uploadStatus.textContent+=" Keep this tab open—browser backup is unavailable.";
+  if(record.print){
+    if(record.print.result?.ok) watchPrint(record.id,record.print.result.jobId);
+    else {
+      let message=record.sending?"Saving before printing…":"Print waiting—will retry automatically. Keep this booth open.";
+      if(!record.durable) message+=" Keep this tab open—browser backup is unavailable.";
+      setPrintStatus(record.id,message);
+    }
+  }
+}, (count) => {
+  document.querySelector("#pendingDelivery").textContent=count?`${count} session${count===1?"":"s"} waiting to finish saving / sending`:"";
+});
+async function uploadSession(session){
   lastSession=session;
-  const C=CONFIG.collection;
-  if(!C.enabled){ setUploadStatus("disabled"); return; }
-  const all = C.target==="both" ? ["local","cloud"] : [C.target];
-  const targets = (onlyTargets && onlyTargets.length) ? onlyTargets : all;
-  if(!onlyTargets) lastUploadMap=null;              // fresh session → fresh slate
-  window.__PB.upload={ status:"uploading", id:null, targets:lastUploadMap?{...lastUploadMap}:{} };
+  if(!CONFIG.collection.enabled){ setUploadStatus("disabled"); return; }
   setUploadStatus("uploading");
-  const results = await Promise.all(targets.map(k=>postOne(k, session)));
-  const byKind = lastUploadMap ? {...lastUploadMap} : {};
-  results.forEach(r=>{ byKind[r.kind]=r; });
-  lastUploadMap=byKind;
-  const anyOk = all.some(k=>byKind[k]&&byKind[k].ok);
-  const savedId = (byKind.cloud&&byKind.cloud.ok&&byKind.cloud.id) || (byKind.local&&byKind.local.ok&&byKind.local.id) || null;
-  window.__PB.upload={ status: anyOk?"saved":"failed", id:savedId, targets:byKind };
-  setUploadStatus(anyOk?"saved":"failed", savedId, byKind, all);
+  await delivery.save(session);
 }
 /* QR of THIS strip's public cloud URL — guests scan it and save the full-res
    strip straight to their phone. Shown once the cloud upload confirms. */
@@ -1019,14 +1096,16 @@ function hideStripQr(){ const el=document.querySelector("#stripQr"); if(el) el.s
 function setUploadStatus(s,id,byKind,targets){
   const el=els.uploadStatus, rb=els.retryUpload; if(!el) return; if(rb) rb.style.display="none";
   if(s==="uploading"){ el.textContent="💾 Saving session…"; el.style.color="var(--muted)"; showStripQrLoading(); return; }
-  if(s==="failed"){ el.textContent="⚠ Upload failed — your download & gallery copy still work."; el.style.color="var(--warn)"; if(rb) rb.style.display=""; hideStripQr(); if(els.closeResult) els.closeResult.style.display=""; return; }
-  if(s==="saved"){
+  if(s==="failed"){ el.textContent="⚠ Save pending — retrying automatically. Your download still works."; el.style.color="var(--warn)"; if(rb) rb.style.display=""; hideStripQr(); if(els.closeResult) els.closeResult.style.display=""; return; }
+  if(s==="saved"||s==="partial"){
     if(byKind && (byKind.cloud||byKind.local)){
       const bits=[];
-      if(byKind.cloud) bits.push("☁ cloud "+(byKind.cloud.ok?"✓":"✗"));
+      if(byKind.cloud) bits.push("☁ Supabase "+(byKind.cloud.ok?"✓":"✗"));
       if(byKind.local) bits.push("💾 local "+(byKind.local.ok?"✓":"✗"));
+      if((targets||[]).includes("local")&&!byKind.local) bits.push("💾 local saving…");
+      if((targets||[]).includes("cloud")&&!byKind.cloud) bits.push("☁ Supabase saving…");
       const allOk=(targets||[]).every(k=>byKind[k]&&byKind[k].ok);
-      el.textContent="Saved — "+bits.join(" · ");
+      el.textContent=(allOk?"Saved — ":"Save pending — ")+bits.join(" · ");
       el.style.color=allOk?"var(--ok)":"var(--warn)";
       if(rb && !allOk) rb.style.display="";   // a destination failed — offer retry
       if(byKind.cloud && byKind.cloud.ok && byKind.cloud.strip) showStripQr(byKind.cloud.strip); else hideStripQr();
@@ -1101,9 +1180,23 @@ function composeStrip(shots, themeId, scale){
   ctx.fillText(F.upper===false?l1:l1.toUpperCase(), stripW/2, footerY+(F.serif?64:62));
   ctx.fillStyle=T.sub; ctx.font=(F.serif?"500 26px "+serifStack():"500 24px "+fontStack());
   ctx.fillText((F.l2!=null)?F.l2:(CONFIG.brandSubtitle||dateLabel()), stripW/2, footerY+102);
-  try { return c.toDataURL("image/png"); }
+  try { return fitDataUrl(c); }
   catch(e){ showToast("Export blocked — a cross-origin background tainted the canvas. Upload the image instead of using its URL."); return null; }
 }
+/* The cloud save and print endpoints take at most 12,000,000 characters per image.
+   A photographic 1200×3600 strip as PNG is ~10–12.5M (more in dim, grainy light), so
+   a busy strip could be refused — no QR, and no print, since printing waits for the
+   archive. Keep PNG when it fits comfortably; otherwise use near-lossless JPEG
+   (q 0.95 is ~2–4M and indistinguishable on a 4×6 print). */
+const IMAGE_CHAR_BUDGET=10_500_000;
+function fitDataUrl(c){
+  const png=c.toDataURL("image/png");
+  if(png.length<=IMAGE_CHAR_BUDGET) return png;
+  for(const q of [0.95,0.9,0.85,0.75]){ const jpg=c.toDataURL("image/jpeg",q); if(jpg.length<=IMAGE_CHAR_BUDGET) return jpg; }
+  return c.toDataURL("image/jpeg",0.6);
+}
+const dataUrlMime=(u)=>(/^data:([^;,]+)/.exec(u||"")||[])[1]||"image/png";
+const extFor=(u)=>dataUrlMime(u)==="image/jpeg"?"jpg":"png";
 /* PRINT SHEET: two identical strips side by side on a 4×6" sheet (1200×1800
    logical @300 DPI, exported at CONFIG.exportScale → 2400×3600 px). Print
    borderless on the Selphy, cut down the center → two 2×6 strips (keep one /
@@ -1126,7 +1219,7 @@ function composePrintSheet(stripUrl){
         ctx.drawImage(im, x0,      y0, w, h);                          // left strip
         ctx.drawImage(im, x0+w+G,  y0, w, h);                          // right strip
         if(CONFIG.printCutLine){ ctx.fillStyle="rgba(0,0,0,.12)"; ctx.fillRect(sheetW/2-0.5, y0, 1, h); }  // center cut guide
-        resolve(c.toDataURL("image/png"));
+        resolve(fitDataUrl(c));
       }catch(e){ reject(e); }
     };
     im.onerror=()=>reject(new Error("strip image failed to load"));
@@ -1165,22 +1258,49 @@ try { memGallery = JSON.parse(localStorage.getItem(STORE_KEY)||"[]"); } catch { 
    best-effort persistence. Big strips can exceed the ~5MB quota — before, a failed
    write left reads pinned to the last-saved copy, so only the FIRST strip showed.
    Now every strip stays in memory and shows, even when the write can't persist. */
-const store={ read(){ return memGallery; }, write(list){ memGallery=list; try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); } catch {} } };
-function saveToGallery(url){ const list=store.read(); list.unshift({url,t:Date.now()}); while(list.length>CONFIG.galleryMax) list.pop(); store.write(list); renderGallery(); }
+/* Memory: a full strip is ~10 MB as a data URL. Keeping 24 of them (plus their
+   decoded images) costs ~300-700 MB, enough for an iPad to kill the tab mid-party.
+   So the gallery shows small thumbnails, holds full-size copies only for the
+   newest few, and older tiles open the strip's cloud copy instead. Only
+   thumbnails go to localStorage. */
+const GALLERY_FULL_KEEP=3;
+const store={ read(){ return memGallery; }, write(list){ memGallery=list;
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(list.filter(x=>x.thumb).map(x=>({thumb:x.thumb,t:x.t,id:x.id,cloud:x.cloud})))); } catch {} } };
+memGallery=memGallery.filter(x=>x&&x.thumb).map(x=>({thumb:x.thumb,t:x.t,id:x.id,cloud:x.cloud}));   // old saves held full strips: drop them
+function stripThumb(url){
+  return new Promise((res)=>{ const im=new Image(); im.onload=()=>{ try { const w=200, h=Math.round(im.height*w/im.width); const c=document.createElement("canvas"); c.width=w; c.height=h; c.getContext("2d").drawImage(im,0,0,w,h); res(c.toDataURL("image/jpeg",0.75)); } catch { res(null); } }; im.onerror=()=>res(null); im.src=url; });
+}
+function saveToGallery(url, id){
+  const list=store.read(); const item={url,t:Date.now(),id:id||null,thumb:null,cloud:null};
+  list.unshift(item); while(list.length>CONFIG.galleryMax) list.pop();
+  list.forEach((x,i)=>{ if(i>=GALLERY_FULL_KEEP && x.thumb) x.url=null; });
+  store.write(list); renderGallery();
+  stripThumb(url).then(th=>{ if(!th) return; item.thumb=th; store.read().forEach((x,i)=>{ if(i>=GALLERY_FULL_KEEP && x.thumb) x.url=null; }); store.write(store.read()); renderGallery(); });
+}
+function galleryCloud(id, cloudUrl){ const it=store.read().find(x=>x.id&&x.id===id); if(it && cloudUrl && it.cloud!==cloudUrl){ it.cloud=cloudUrl; store.write(store.read()); } }
 function renderGallery(){
   const list=store.read(); els.clearGallery.style.display=list.length?"":"none";
   if(!list.length){ els.gallery.innerHTML='<div class="empty">Your strips will show up here.</div>'; return; }
   els.gallery.innerHTML="";
-  list.forEach((item,i)=>{ const div=document.createElement("div"); div.className="thumb"; div.innerHTML=`<img src="${item.url}" alt="strip ${i+1}" /><div class="dl">⬇ download</div>`; div.addEventListener("click",()=>downloadURL(item.url, stripFilename(item.t))); els.gallery.appendChild(div); });
+  list.forEach((item,i)=>{
+    const src=item.thumb||item.url; if(!src) return;
+    const div=document.createElement("div"); div.className="thumb";
+    const img=document.createElement("img"); img.src=src; img.alt="strip "+(i+1); img.decoding="async";
+    const dl=document.createElement("div"); dl.className="dl"; dl.textContent=item.url?"⬇ download":(item.cloud?"☁ open":"");
+    div.append(img, dl);
+    div.addEventListener("click",()=>{ const it=store.read().find(x=>x===item)||item;
+      if(it.url) downloadURL(it.url, stripFilename(it.t, it.url)); else if(it.cloud) window.open(it.cloud,"_blank","noopener"); else showToast("The full-size strip is in the cloud gallery."); });
+    els.gallery.appendChild(div);
+  });
 }
-function stripFilename(t){ const d=new Date(t||Date.now()), p=(x)=>String(x).padStart(2,"0"); return `photobooth_${state.lastStripTheme||state.stripTheme}_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.png`; }
+function stripFilename(t,url){ const d=new Date(t||Date.now()), p=(x)=>String(x).padStart(2,"0"); return `photobooth_${state.lastStripTheme||state.stripTheme}_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.${extFor(url)}`; }
 function downloadURL(url,filename){ const a=document.createElement("a"); a.href=url; a.download=filename||"photobooth.png"; document.body.appendChild(a); a.click(); a.remove(); }
 
 /* ---------- 8) UI helpers + events ---------------------------------------- */
 function buildShotDots(n){ els.shotDots.innerHTML=""; for(let i=0;i<n;i++){ const d=document.createElement("div"); d.className="dot"; els.shotDots.appendChild(d); } els.shotDots.classList.remove("hidden"); }
 function markShotDone(i){ const d=els.shotDots.children[i]; if(d) d.classList.add("done"); }
-function setControlsEnabled(on){ els.startBtn.disabled=!on||!state.stream; els.switchCam.disabled=!on; els.mirrorBtn.disabled=!on; els.bgToggle.disabled=!on; els.countSeg.querySelectorAll("button").forEach(b=>b.disabled=!on); setPropSegEnabled(on); }
-function showResult(url){ els.stripPreview.src=url; if(els.closeResult) els.closeResult.style.display="none"; { const t=CONFIG.collection&&CONFIG.collection.target; if(CONFIG.collection&&CONFIG.collection.enabled&&(t==="cloud"||t==="both")) showStripQrLoading(); } els.result.classList.add("show"); clearTimeout(state.resultTimer); state.resultTimer=setTimeout(()=>{ if(els.result.classList.contains("show")) hideResult(); }, 45000); clearTimeout(state.closeRevealTimer); state.closeRevealTimer=setTimeout(()=>{ if(els.closeResult) els.closeResult.style.display=""; }, 8000); }
+function setControlsEnabled(on){ els.startBtn.disabled=!on||!state.stream||els.camError.classList.contains("show"); els.switchCam.disabled=!on; els.mirrorBtn.disabled=!on; els.bgToggle.disabled=!on; els.countSeg.querySelectorAll("button").forEach(b=>b.disabled=!on); setPropSegEnabled(on); }
+function showResult(url){ els.stripPreview.src=url; if(els.closeResult) els.closeResult.style.display="none"; { const t=CONFIG.collection&&CONFIG.collection.target; if(CONFIG.collection&&CONFIG.collection.enabled&&(t==="cloud"||t==="both")) showStripQrLoading(); } els.result.classList.add("show"); document.querySelector("#resultCard").scrollTop=0; clearTimeout(state.resultTimer); state.resultTimer=setTimeout(()=>{ if(els.result.classList.contains("show")) hideResult(); }, 45000); clearTimeout(state.closeRevealTimer); state.closeRevealTimer=setTimeout(()=>{ if(els.closeResult) els.closeResult.style.display=""; }, 8000); }
 function setBoomResultUI(boom){
   const v=document.querySelector("#boomVid"); if(!v) return;
   if(boom && boom.blob){ v.src=URL.createObjectURL(boom.blob); v.style.display=""; }
@@ -1219,18 +1339,18 @@ els.printBtn.addEventListener("click", enqueuePrint);
    AirDrop, Messages…) via the Web Share API; on desktop it downloads. */
 async function saveStrip(){
   const url=state.lastStripURL; if(!url) return;
-  const name=stripFilename();
+  const name=stripFilename(null, url);
   const touch = matchMedia("(pointer:coarse)").matches;
   try{
     if(touch && navigator.canShare){
       const blob=await (await fetch(url)).blob();
-      const file=new File([blob], name, {type:"image/png"});
+      const file=new File([blob], name, {type:dataUrlMime(url)});
       if(navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:"Photobooth strip"}); return; }
     }
   }catch(e){ if(e && e.name==="AbortError") return; /* user closed the sheet */ }
   downloadURL(url, name);
 }
-function printFilename(){ const d=new Date(), p=(x)=>String(x).padStart(2,"0"); return `LisaPete_printsheet_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.png`; }
+function printFilename(url){ const d=new Date(), p=(x)=>String(x).padStart(2,"0"); return `LisaPete_printsheet_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.${extFor(url)}`; }
 /* Save / hand-off path: build the 4×6 two-strip sheet, then share it (iOS share
    sheet → Canon SELPHY app, or Save to Photos) or download (desktop). */
 async function savePrintSheet(){
@@ -1239,39 +1359,68 @@ async function savePrintSheet(){
   if(btn){ btn.disabled=true; btn.textContent="🖨 Preparing…"; }
   try{
     const url=await composePrintSheet(state.lastStripURL);
-    const name=printFilename();
+    const name=printFilename(url);
     const touch=matchMedia("(pointer:coarse)").matches;
     if(touch && navigator.canShare){
       const blob=await (await fetch(url)).blob();
-      const file=new File([blob], name, {type:"image/png"});
+      const file=new File([blob], name, {type:dataUrlMime(url)});
       if(navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:"Photobooth print sheet"}); return; }
     }
     downloadURL(url, name);
   }catch(e){ if(e && e.name==="AbortError") return; showToast("Couldn't build the print sheet — try again."); }
   finally{ if(btn){ btn.disabled=false; btn.textContent=orig; } }
 }
-/* One-tap print: compose the 4×6 sheet and drop it in the cloud print queue.
-   The Mac print server at the event picks it up and prints to the Selphy — no
-   share sheet, no printer dialog. Just a confirmation toast. */
+/* Print requests survive reloads alongside their session. The archive is
+   confirmed before the print job is created. Queue acceptance is not printing. */
+let watchedPrint=null, printTimer=null;
+function setPrintStatus(sessionId,text){
+  if(lastSession?.id===sessionId) document.querySelector("#printStatus").textContent=text;
+}
+function resetPrintStatus(){
+  clearTimeout(printTimer); watchedPrint=null;
+  document.querySelector("#printStatus").textContent="";
+  els.printBtn.disabled=false; els.printBtn.textContent="🖨 Print";
+}
+function watchPrint(sessionId,jobId){
+  if(lastSession?.id!==sessionId||watchedPrint===jobId) return;
+  watchedPrint=jobId;
+  els.printBtn.disabled=true; els.printBtn.textContent="✓ Print requested";
+  setPrintStatus(sessionId,"Queued—waiting for the booth Mac.");
+  const C=CONFIG.collection.cloud;
+  const root=C.endpoint.split('/functions/')[0];
+  async function check(){
+    if(lastSession?.id!==sessionId||watchedPrint!==jobId) return;
+    try{
+      const response=await fetch(`${root}/rest/v1/print_jobs?id=eq.${encodeURIComponent(jobId)}&select=status,error`,{
+        headers:{apikey:C.anonKey,Authorization:"Bearer "+C.anonKey},signal:AbortSignal.timeout(10000),cache:"no-store"
+      });
+      if(!response.ok) throw new Error("Status unavailable");
+      const job=(await response.json())[0];
+      if(!job) throw new Error("Job not found");
+      const messages={pending:"Queued—waiting for the booth Mac.",printing:"The booth Mac is preparing your print.",done:"Sent to the SELPHY print queue. Check the printer for your sheet.",error:"Printer needs attention. Your photos are saved—ask the booth host."};
+      setPrintStatus(sessionId,messages[job.status]||"Waiting for printer status…");
+      if(job.status==="done"||job.status==="error") return;
+    }catch{ setPrintStatus(sessionId,"Print requested. Cannot check printer status right now."); }
+    if(lastSession?.id===sessionId) printTimer=setTimeout(check,3000);
+  }
+  check();
+}
 async function enqueuePrint(){
-  if(!state.lastStripURL) return;
-  const btn=els.printBtn, orig=btn?btn.textContent:"";
-  if(btn){ btn.disabled=true; btn.textContent="🖨 Sending…"; }
+  const session=lastSession;
+  if(!session||!state.lastStripURL) return;
+  els.printBtn.disabled=true; els.printBtn.textContent="🖨 Preparing…";
+  setPrintStatus(session.id,"Saving your photos and preparing the print…");
   try{
-    const image=await composePrintSheet(state.lastStripURL);
-    const C=CONFIG.collection.cloud;
-    const endpoint=C.endpoint.replace(/\/[^/]+$/, "/print");
-    const res=await fetch(endpoint,{ method:"POST",
-      headers:{ "Content-Type":"application/json", "apikey":C.anonKey, "Authorization":"Bearer "+C.anonKey, "x-booth-key":C.boothKey },
-      body:JSON.stringify({ image }) });
-    if(!res.ok) throw new Error("HTTP "+res.status);
-    const data=await res.json(); if(!data.ok) throw new Error(data.error||"server error");
-    if(btn){ btn.textContent="✓ Sent to printer"; }
-    showToast("🖨 Sent to the printer!");
-    setTimeout(()=>{ if(btn){ btn.disabled=false; btn.textContent=orig; } }, 2500);
-  }catch(e){
-    if(btn){ btn.disabled=false; btn.textContent=orig; }
-    showToast("Couldn't reach the printer — is the Mac print server running?");
+    const image=await composePrintSheet(session.strip);
+    await delivery.requestPrint(session,image);
+    if(lastSession?.id===session.id&&!watchedPrint){
+      els.printBtn.disabled=false; els.printBtn.textContent="↻ Retry print";
+    }
+  }catch{
+    if(lastSession?.id===session.id){
+      els.printBtn.disabled=false; els.printBtn.textContent="↻ Retry print";
+      setPrintStatus(session.id,"Couldn't prepare the print. Please try again.");
+    }
   }
 }
 /* Direct AirPrint path: build the 4×6, drop it into a hidden iframe sized to the
@@ -1300,8 +1449,7 @@ async function airPrintSheet(){
 els.againBtn.addEventListener("click", ()=>{ hideResult(); runSession(); });
 els.retryUpload.addEventListener("click", ()=>{
   if(!lastSession) return;
-  const failed = lastUploadMap ? Object.keys(lastUploadMap).filter(k=>!lastUploadMap[k].ok) : null;
-  uploadSession(lastSession, failed && failed.length ? failed : null);   // only re-send what failed
+  uploadSession(lastSession);   // delivery remembers each successful destination
 });
 els.closeResult.addEventListener("click", hideResult);
 els.clearGallery.addEventListener("click", ()=>{ store.write([]); renderGallery(); });
@@ -1332,10 +1480,26 @@ document.addEventListener("keydown", (e)=>{
   else if(e.code==="Escape"){ hideResult(); }
 });
 
+/* ---------- keep the screen on; recover after the screen/app comes back ----- */
+async function keepAwake(){
+  try {
+    if(!("wakeLock" in navigator) || window.__PB.wakeLock || document.visibilityState!=="visible") return;
+    const lock=await navigator.wakeLock.request("screen"); window.__PB.wakeLock=lock;
+    lock.addEventListener("release", ()=>{ if(window.__PB.wakeLock===lock) window.__PB.wakeLock=null; });
+  } catch { /* not supported / not allowed yet: retried on the next tap */ }
+}
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState!=="visible") return;
+  keepAwake();
+  if(!camStarting && !camLastErr && !cameraLive()) cameraLost("came back");
+});
+document.addEventListener("pointerdown", keepAwake, { passive:true });
+window.addEventListener("unhandledrejection", (e)=>{ window.__PB.error=String(e.reason&&e.reason.message||e.reason); });
+
 /* ---------- boot ---------------------------------------------------------- */
 els.brandTitle.textContent=CONFIG.brandTitle; document.title=CONFIG.brandTitle+" · V"+CONFIG.appVersion;
 if(matchMedia("(pointer:coarse)").matches) els.downloadBtn.textContent="📤 Share photo";   // touch → share sheet
-applyMirror(); if(els.themeSel) els.themeSel.value=state.stripTheme; renderGallery(); preloadBackgrounds(); checkCollection(); checkRestyle(); startCamera();
+applyMirror(); if(els.themeSel) els.themeSel.value=state.stripTheme; renderGallery(); preloadBackgrounds(); checkCollection(); checkRestyle(); startCamera(); keepAwake();
 </script>
 </body>
 </html>

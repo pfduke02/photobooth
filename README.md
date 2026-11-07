@@ -1,82 +1,129 @@
-# Photobooth · V1.0
+# Photobooth
 
-A browser-based digital photobooth with **cloud + local collection**, ready to
-host on a **public URL**.
+Live booth: **https://photobooth-c7s.pages.dev/**
 
-**V1.0 (Sprint 1):** print-true strips — exactly **2×6" @ 300 DPI** (exported
-2×, 1200×3600; square cells for 3-shot) so future printing needs no resample;
-countdown beeps + shutter click (WebAudio, no files); `noindex,nofollow` +
-`_headers`; upload endpoint hardened (shared booth key + payload validation);
-`sessions` table gained query columns (`ai_enabled`, `app_version`, `favorite`,
-`tags`, `note`) saved from day one.
+The active app is in **`photobooth-repo/`**. Its `index.html` matches the deployed site; the root `index.html` is a legacy copy. Cloudflare Pages must publish `photobooth-repo`, not the repository root.
 
-- **Booth** — webcam → 3s countdown → 3/4 photos → strip PNG → gallery →
-  download. On-device AI background replace (incl. the Lisa & Pete wedding
-  backdrop) and strip themes (Classic / Noir / Warm Film / Wedding).
-- **Collection** — each session POSTs `{strip, frames[], meta}` to storage.
-  On **localhost** it writes **both** local disk *and* the cloud; on a
-  **hosted URL** it auto-switches to **cloud-only** (there's no local server
-  there). Override with `?collect=local|cloud|both`.
-- **Gallery** (`gallery.html`) — reads the cloud by default (`?local=1` for the
-  local server). **📱 QR** buttons on both pages show a scannable code for the
-  current URL — that's how guests get to it once hosted.
+## Repo map
+
+| Path | What |
+|---|---|
+| `photobooth-repo/` | The web app Cloudflare Pages publishes (booth, gallery, assets, local server). Anything committed here is public. |
+| `supabase/` | Backend source: migrations and the `session`, `print`, `admin` Edge Functions. See [`supabase/README.md`](supabase/README.md). |
+| `printserver.js`, `install-printserver.sh` | MacBook Air print worker and its launch-agent installer. |
+| `deploy.sh` | Commit + push = deploy. Refuses to commit guest data (`sessions/`, `strips/`, `prints/`). |
+
+## Saving and printing
+
+Each finished session gets one ID. Its strip, original frames and optional boomerang are saved to the Supabase `photobooth` project (`xjnqnxorqhobikyzshrt`), in the `sessions` bucket and table. This happens whether or not the guest prints.
+
+**Print** composes two matching strips on one 4×6 sheet (2400×3600 pixels). It waits for that session's cloud archive to be confirmed, saves the sheet in Supabase, and creates one `print_jobs` entry linked by `meta.sessionId`. The MacBook Air's worker claims the entry, downloads the image and submits it to the SELPHY using macOS `lp`.
+
+The result screen distinguishes:
+
+- **Saved — Supabase ✓:** the photo archive is confirmed.
+- **Queued—waiting for the booth Mac:** Supabase accepted the print request.
+- **The booth Mac is preparing your print:** a worker claimed the job.
+- **Sent to the SELPHY print queue:** macOS accepted the job. Check the printer for physical completion; paper/ink problems can still stop a queued sheet.
+- **Printer needs attention:** the photo archive is safe; the host should check the Air's logs and printer.
+
+Pending sessions and print requests are kept in IndexedDB. They retry every 30 seconds, on reconnect, and when the same site is reopened in the same browser profile. Successful destinations are not resent. Stable session and print IDs avoid duplicates after a lost response. If browser storage is unavailable, the UI says to keep the tab open. Clearing site data/private browsing can remove pending backups. Cloud printing requires internet access; offline requests wait for reconnection.
+
+Updates from multiple tabs are merged in a single IndexedDB transaction. Small completed-job receipts retain IDs and success results so a stale tab cannot recreate a print; completed receipts contain no image payloads. A slow local save does not hold up a print whose Supabase archive is confirmed. Save status and the QR update as each destination finishes.
 
 ## Run locally
 
-```bash
-cd <this-folder>
-node server.mjs        # or: python3 server.py
-# open http://localhost:8099/
+Use Node.js 22 or newer:
+
+```sh
+npm ci
+npm start
+# Open http://localhost:8099/
 ```
 
-`index.html` is the booth (renamed from photobooth.html so the bare URL works
-when hosted). The local server serves it at `/` and saves sessions to
-`sessions/<id>/{strip.png, frame-N.jpg, metadata.json}`.
+Local mode saves to `photobooth-repo/sessions/<id>/` and Supabase. Hosted mode saves to Supabase. Override with `?collect=local|cloud|both`. Pressing Print always requests a cloud archive even when local-only collection was selected. `SESSIONS_DIR` can move local storage elsewhere.
 
-**If the status ever shows `💾 local ✗`:** open http://localhost:8099/api/health.
-`{"ok":true}` → the right server is running (then check the folder is writable —
-macOS sometimes blocks writes in Downloads; move the folder to e.g. ~/photobooth).
-An error/404 → you're running a plain static server (or double-clicked the
-file); quit it and run `node server.mjs` / `python3 server.py` from this folder.
-On the public URL this doesn't apply — uploads go cloud-only.
+## Set up the MacBook Air
 
-## Host it publicly (Cloudflare Pages ← GitHub, free)
+1. Connect the SELPHY and add it in **System Settings → Printers & Scanners**.
+2. Keep a copy of this repo in a permanent folder on the Air, with Node.js 22+ installed.
+3. Check the printer queue name with `lpstat -p`.
+4. Stop any manually running old `node printserver.js` process. The installer replaces the existing `com.lisapete.printserver` login agent.
+5. From the repo root, run:
 
-The repo is the deploy source — every push to `main` auto-deploys:
-
-1. Code lives at **github.com/pfduke02/photobooth**.
-2. **dash.cloudflare.com → Workers & Pages → Create → Pages → Connect to Git**,
-   authorize GitHub, pick `pfduke02/photobooth`.
-3. Build settings: Framework preset **None**, build command **empty**, build
-   output directory **`/`** → Deploy.
-4. You get `https://<name>.pages.dev` — HTTPS, so the camera works. On a hosted
-   URL the app auto-switches to **cloud-only** collection (no local server
-   there); uploads go to Supabase, the gallery reads from it anywhere, and the
-   `_headers` file adds `X-Robots-Tag: noindex`.
-
-**Custom domain (later, optional):** DNS is on Cloudflare, so either attach
-`photobooth.sternfishmanwedding.com` in Pages → Custom domains (one CNAME), or
-mount `sternfishmanwedding.com/photobooth` with a small Worker route. The app
-is base-path-safe either way.
-
-## The cloud backend (Supabase project `photobooth`)
-
-In your Supabase account (org "Data Collector"): Storage bucket `sessions`
-(strips + frames under `<id>/`), Postgres table `sessions` (metadata — query it
-with SQL), Edge Function `session` (receives uploads; CORS `*`). The anon key in
-the frontend is public-by-design; strips are readable only via unguessable
-per-session IDs. Lock down later with signed URLs/auth if wanted.
-
-## Test it
-
-```bash
-npm install playwright
-node server.mjs &
-node test.mjs && node test_collection.mjs && node test_gallery.mjs \
-  && node test_themes.mjs && node test_both.mjs
+```sh
+bash install-printserver.sh Canon_SELPHY_CP1500
 ```
 
-## What's next
+Replace the last argument if `lpstat` shows a different name. The installer builds a launch agent using this Mac's actual paths, starts it immediately, and restarts it at login. The older checked-in plist contains another Mac's path; do not install that file directly.
 
-Central Park backdrop (needs the photo file); booth polish (boomerang/GIF,
-sounds); auth/locking for the gallery. See `ROADMAP.md`.
+Keep the Air plugged in, awake and logged in during the event. A browser or iPad can run the booth; the Air must reach Supabase and the SELPHY.
+
+```sh
+# Inspect worker output:
+tail -f "$HOME/Library/Logs/Photobooth/printserver.log"
+# Check pending macOS print jobs:
+lpstat -o
+# Stop the worker:
+launchctl bootout "gui/$(id -u)/com.lisapete.printserver"
+# Read/download a pending cloud job without changing its state or printing:
+DRY_RUN=1 node printserver.js
+```
+
+The worker uses `media=Postcard.Fullbleed`; override `LP_OPTS` for a manual run if needed. Local print receipts live under `~/Library/Application Support/Photobooth/print-spool`. If acknowledgement fails after `lp` accepts a job, the worker retries acknowledgement without printing again. A receipt is retained until the row is confirmed as `done`, then kept as a small `.submitted.json` marker. A conflicting row state stops the worker with a host-attention message. Do not delete these markers or reset a submitted job to `pending`; use a new job ID for an intentional extra sheet.
+
+If the Mac crashes during submission, the job can remain `printing`: inspect the macOS queue and physical output before taking action. Neither a cloud queue acknowledgement nor a successful `lp` exit proves that a sheet emerged from the SELPHY.
+
+For one controlled test, stop all background workers first and select the exact test job:
+
+```sh
+# Read/download only; leaves this and every other job unchanged:
+PRINT_JOB_ID=YYYY-MM-DD_012345abcdef DRY_RUN=1 node printserver.js --once
+# Submit only this pending job, then exit:
+PRINT_JOB_ID=YYYY-MM-DD_012345abcdef PRINTER=Canon_SELPHY_CP1500 node printserver.js --once
+```
+
+Replace the placeholder with the actual test job ID. `--once` refuses to run without an explicit ID. It does not drain the queue or acknowledge unrelated local receipts. Exit 0 means the selected operation succeeded, 2 means the selected job was not pending, and 1 means an error. The continuous worker still starts immediately when the installer is run; do not use installation itself as a one-sheet test.
+
+## Booth day: preflight and two SELPHYs
+
+On the Air, from the repo root:
+
+```sh
+bash preflight.sh               # read-only: power, sleep, disk, node, repo, printer queue, worker, Supabase, site
+bash preflight.sh --print-test  # also prints one local test sheet (print-test-4x6.png) straight to the SELPHY
+```
+
+The test sheet's red border should reach all four edges; the grey inset lines show how much the printer trims.
+
+**Two SELPHYs:** put both into one CUPS class, then point the worker at the class. Jobs go to whichever printer is free:
+
+```sh
+lpstat -p                                       # note both queue names
+sudo lpadmin -p <first_queue>  -c selphys
+sudo lpadmin -p <second_queue> -c selphys
+sudo cupsenable selphys && sudo cupsaccept selphys
+bash install-printserver.sh selphys
+PRINTER=selphys bash preflight.sh --print-test  # run twice; each printer should take one sheet
+```
+
+To drop back to one printer, run `bash install-printserver.sh <first_queue>`. Both printers need the same paper/ink kit (KP-108IN, 4×6).
+
+## Release order
+
+1. Deploy `supabase/functions/print` with JWT verification **on**. This adds retry-safe IDs while retaining compatibility with the old booth. It uses the existing bucket, table and policies; no database migration is required.
+2. Publish the updated `photobooth-repo/` directory to Cloudflare Pages.
+3. Update and restart the worker on the MacBook Air. Stop all older worker instances; their non-atomic claims cannot be made safe by a new worker running alongside them.
+4. Run one real booth session, check **Supabase ✓**, press Print once, and verify the physical 4×6 sheet. Confirm its `sessions` row and linked `print_jobs` row.
+
+The existing bucket and gallery remain publicly readable by URL. The existing public booth key and anon queue policies are retained; no service-role key is embedded in client code. This change does not redesign gallery or queue authentication.
+
+## Tests
+
+```sh
+npm ci
+npx playwright install chromium
+npm test
+```
+
+Tests use a simulated camera, temporary local storage, mocked Supabase requests and a fake `lp` function. They cover upload/reload recovery, partial saves, guest isolation, idempotent print requests, atomic worker claims, dry-run behavior and acknowledgement recovery. They do not send anything to a real printer or change live Supabase data.
