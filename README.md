@@ -85,29 +85,28 @@ PRINT_JOB_ID=YYYY-MM-DD_012345abcdef PRINTER=Canon_SELPHY_CP1500 node printserve
 
 Replace the placeholder with the actual test job ID. `--once` refuses to run without an explicit ID. It does not drain the queue or acknowledge unrelated local receipts. Exit 0 means the selected operation succeeded, 2 means the selected job was not pending, and 1 means an error. The continuous worker still starts immediately when the installer is run; do not use installation itself as a one-sheet test.
 
-## Booth day: preflight and two SELPHYs
+## Booth day: two SELPHYs, the printer switch, preflight
 
-On the Air, from the repo root:
-
-```sh
-bash preflight.sh               # read-only: power, sleep, disk, node, repo, printer queue, worker, Supabase, site
-bash preflight.sh --print-test  # also prints one local test sheet (print-test-4x6.png) straight to the SELPHY
-```
-
-The test sheet's red border should reach all four edges; the grey inset lines show how much the printer trims.
-
-**Two SELPHYs:** put both into one CUPS class, then point the worker at the class. Jobs go to whichever printer is free:
+**Setup on the Air (once, ~10 min):** add both SELPHYs in **System Settings → Printers & Scanners** (on the venue Wi-Fi), then from the repo root:
 
 ```sh
-lpstat -p                                       # note both queue names
-sudo lpadmin -p <first_queue>  -c selphys
-sudo lpadmin -p <second_queue> -c selphys
-sudo cupsenable selphys && sudo cupsaccept selphys
-bash install-printserver.sh selphys
-PRINTER=selphys bash preflight.sh --print-test  # run twice; each printer should take one sheet
+git pull
+bash install-printserver.sh          # no name needed: the worker finds every SELPHY queue
+bash preflight.sh --print-test       # checks everything and prints one test sheet on EACH SELPHY
 ```
 
-To drop back to one printer, run `bash install-printserver.sh <first_queue>`. Both printers need the same paper/ink kit (KP-108IN, 4×6).
+**Printer switch** — `sternfishmanwedding.com/photos/admin` → **📸 Photobooth** (same personal links as the photo admin):
+
+- **Alternate** (default): each sheet goes to the less busy SELPHY, taking turns. A printer macOS has stopped (jam, paper, ink, unreachable) is skipped automatically.
+- **Only <printer>**: everything goes to one SELPHY. Sheets still waiting in the other printer's macOS queue are moved over (`lpmove`).
+- **Pause**: prints wait in the cloud queue until you switch back.
+- A stopped printer shows **Resume this printer** (runs `cupsenable` on the Air) — fix the jam/paper first.
+- **Recent prints** shows each sheet's printer and status, with **Reprint on <printer>**.
+- **Reset booth camera / Reload booth** act on the iPad within ~15 s, but never mid-session.
+
+The worker reads the switch before every sheet and reports printer status every ~15 s. If the switch can't be reached it keeps alternating. To pin one queue or a CUPS class instead: `bash install-printserver.sh <queue_or_class>`.
+
+**On the iPad:** the small **⟳ camera** button (bottom-left of the camera view) restarts the camera — use it for a sideways, stretched or blurry picture instead of restarting the iPad. Turn on Rotation Lock and Guided Access so the booth can't rotate or be left.
 
 ## Release order
 

@@ -280,4 +280,4 @@ if (require.main === module) {
     }
   })();
 }
-module.exports = { createWorker };
+module.exports = { createWorker, defaultControl };
