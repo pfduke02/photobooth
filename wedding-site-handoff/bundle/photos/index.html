@@ -101,7 +101,7 @@
   .tile[data-state=removed] .state { color: var(--muted); }
   .tile .pct { position: absolute; left: 6px; bottom: 16px; display: none; padding: 3px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(251,249,243,0.94); color: var(--ink); }
   .tile[data-state=uploading].video .pct { display: block; }
-  .tile .badges { position: absolute; top: 6px; left: 6px; display: flex; gap: 4px; }
+  .tile .badges { position: absolute; top: 6px; left: 6px; right: 42px; display: flex; flex-wrap: wrap; gap: 4px; pointer-events: none; }
   .tile .badges span { padding: 3px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(29,36,51,0.72); color: #fff; }
   .tile .rm { position: absolute; top: 6px; right: 6px; min-width: 32px; height: 32px; padding: 0; border: 0; border-radius: 999px; background: rgba(251,249,243,0.94); color: var(--ink); font: 600 18px/1 'Archivo', system-ui, sans-serif; cursor: pointer; }
   .tile.confirm .rm { padding: 0 12px; background: var(--terracotta); color: #fff; font-size: 13px; }
