@@ -1,0 +1,6 @@
+{
+  "name": "wedding-uploader-tests",
+  "private": true,
+  "type": "module",
+  "dependencies": { "tus-js-client": "4.3.1", "playwright": "^1.61.1" }
+}

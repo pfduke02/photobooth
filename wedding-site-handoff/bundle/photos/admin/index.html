@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Guest photos &amp; videos — Lisa &amp; Pete</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#f6f3ea">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&amp;family=Archivo:wght@400;500;600&amp;family=Pinyon+Script&amp;display=swap" rel="stylesheet">
+<style>
+  :root { --cream: #f6f3ea; --paper: #fbf9f3; --ink: #1d2433; --muted: rgba(29,36,51,0.72); --terracotta: #b05f36; --forest: #26493a; --line: rgba(29,36,51,0.14); }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; background: var(--cream); color: var(--ink); font-family: 'Archivo', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: var(--forest); }
+  header { border-bottom: 1px solid var(--line); }
+  .bar { max-width: 1280px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+  .logo { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 600; letter-spacing: 0.04em; color: var(--ink); text-decoration: none; }
+  .logo span { color: var(--terracotta); font-style: italic; }
+  .who { font-size: 13px; color: var(--muted); }
+  main { max-width: 1280px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { margin: 0; font-family: 'Pinyon Script', serif; font-weight: 400; font-size: clamp(40px, 7vw, 56px); line-height: 1.1; }
+  .eyebrow { font-family: 'Cormorant Garamond', serif; font-size: 13px; font-weight: 600; letter-spacing: 0.3em; text-transform: uppercase; color: var(--terracotta); }
+  .stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 16px; }
+  .stat { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; min-width: 120px; }
+  .stat b { display: block; font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 600; line-height: 1.1; }
+  .stat span { font-size: 12px; color: var(--muted); letter-spacing: 0.04em; }
+
+  .albumbox { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 0 18px; padding: 14px 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; }
+  .albumbox .state { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+  .albumbox .dot { width: 10px; height: 10px; border-radius: 50%; background: #b9b3a6; }
+  .albumbox.on .dot { background: #2e8b57; }
+  .albumbox .hint { flex: 1 1 280px; font-size: 14px; color: var(--muted); }
+
+  .booth { margin: 0 0 18px; padding: 14px 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; }
+  .booth summary { cursor: pointer; font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; list-style: none; }
+  .booth summary::-webkit-details-marker { display: none; }
+  .booth summary .chev { margin-left: auto; color: var(--muted); font-weight: 500; font-size: 13px; }
+  .booth .pill { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; font-size: 13px; color: var(--muted); }
+  .booth .led { width: 9px; height: 9px; border-radius: 50%; background: #b9b3a6; flex: none; }
+  .booth .led.ok { background: #2e8b57; } .booth .led.warn { background: #d49a1f; } .booth .led.bad { background: #c0392b; }
+  .booth h3 { margin: 16px 0 8px; font: 600 12px 'Archivo', system-ui, sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--terracotta); }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button { font: 600 14px 'Archivo', system-ui, sans-serif; min-height: 42px; padding: 8px 14px; border-radius: 6px; border: 1px solid rgba(29,36,51,.25); background: #fff; color: var(--ink); cursor: pointer; }
+  .seg button.on { background: var(--forest); border-color: var(--forest); color: var(--cream); }
+  .seg button.pause.on { background: #9b2c1f; border-color: #9b2c1f; }
+  .seg button:disabled { opacity: .5; cursor: default; }
+  .printers { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; margin-top: 10px; }
+  .printer { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; background: #fff; font-size: 14px; }
+  .printer b { display: flex; align-items: center; gap: 8px; }
+  .printer .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .printer button { margin-top: 8px; }
+  .boothrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .boothnote { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+  .jobs { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .jobs td { padding: 8px 6px; border-top: 1px solid var(--line); vertical-align: top; }
+  .jobs .st { font-weight: 600; white-space: nowrap; }
+  .jobs .st.error { color: #9b2c1f; } .jobs .st.pending, .jobs .st.printing { color: #a06a00; } .jobs .st.done { color: #1f6b41; }
+  .jobs .err { color: #9b2c1f; font-size: 12px; }
+  .jobs .acts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+  .jobs .acts button, .jobs .acts a { font: 600 12px 'Archivo', system-ui, sans-serif; padding: 6px 9px; min-height: 32px; border-radius: 6px; border: 1px solid rgba(29,36,51,.25); background: #fff; color: var(--ink); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+  @media (max-width: 560px) { .jobs .when { display: none; } }
+  .tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
+  select, .tbtn { font: 500 15px 'Archivo', system-ui, sans-serif; color: var(--ink); background: #fff; border: 1px solid rgba(29,36,51,0.25); border-radius: 6px; padding: 9px 12px; min-height: 42px; }
+  .tbtn { cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+  .tbtn:hover { border-color: var(--forest); }
+  .tbtn.go { background: var(--forest); border-color: var(--forest); color: var(--cream); }
+  .tbtn.armed { background: #2e8b57; border-color: #2e8b57; color: #fff; }
+  .tbtn:disabled { opacity: 0.6; cursor: default; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .tile { position: relative; margin: 0; aspect-ratio: 1 / 1; border-radius: 6px; overflow: hidden; background: #e9e3d3; }
+  .tile .open { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; padding: 0; margin: 0; background: none; cursor: pointer; display: block; }
+  .tile img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.12s ease; }
+  .tile .chk { position: absolute; top: 6px; right: 6px; z-index: 2; width: 32px; height: 32px; border-radius: 50%; border: 2px solid #fff; background: rgba(0,0,0,0.28); color: transparent; font: 700 17px/1 'Archivo', system-ui, sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+  .tile .chk::before { content: '✓'; }
+  .tile .chk:hover { background: rgba(0,0,0,0.45); color: rgba(255,255,255,0.7); }
+  .tile.sel { box-shadow: 0 0 0 3px var(--forest); }
+  .tile.sel img { transform: scale(0.9); border-radius: 4px; }
+  .tile.sel .chk { background: var(--forest); border-color: #fff; color: #fff; }
+  .tile .chk:focus-visible, .tile .open:focus-visible { outline: 3px solid rgba(176,95,54,0.6); outline-offset: -3px; }
+  .tile .ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 10px; font-size: 12px; color: var(--muted); word-break: break-all; text-align: center; }
+  .tile .cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 8px 6px; font-size: 12px; font-weight: 500; color: #fff; text-align: left; background: linear-gradient(transparent, rgba(0,0,0,0.55)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile.is-hidden img, .tile.is-outtake img { opacity: 0.35; }
+  .tags { position: absolute; top: 6px; left: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .tags span { padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; color: #fff; }
+  .tags .t-album { background: #2e8b57; }
+  .tags .t-hidden { background: var(--terracotta); }
+  .tags .t-out { background: #6b6f78; }
+  .tags .t-del { background: #9b2c1f; }
+  .tags .t-vid { background: #1d2433; }
+  .tags .t-priv { background: #7a4b8a; }
+  .tile.is-video .ph { background: linear-gradient(135deg, #2b2f3a, #11141c); color: #ddd; }
+  .stat.link { cursor: pointer; font: inherit; color: inherit; text-align: left; }
+  .stat.link:hover { border-color: var(--forest); }
+  .selbar { position: sticky; bottom: 0; z-index: 5; margin: 16px -8px 0; padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); background: var(--ink); color: var(--cream); border-radius: 10px 10px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; box-shadow: 0 -6px 24px rgba(0,0,0,0.18); }
+  .selbar .count { font-weight: 600; margin-right: auto; min-width: 7em; }
+  .selbar .sbtn { font: 600 14px 'Archivo', system-ui, sans-serif; min-height: 40px; padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(246,243,234,0.4); background: transparent; color: var(--cream); cursor: pointer; }
+  .selbar .sbtn:hover { border-color: var(--cream); }
+  .selbar .sbtn.album { background: #2e8b57; border-color: #2e8b57; }
+  .selbar .sbtn.danger { border-color: #e08a7a; color: #ffd5cc; }
+  .selbar .sbtn.danger.armed { background: #9b2c1f; border-color: #9b2c1f; color: #fff; }
+  .selbar .sbtn:disabled { opacity: 0.4; cursor: default; }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 20; max-width: calc(100vw - 32px); background: var(--ink); color: var(--cream); padding: 12px 16px; border-radius: 8px; display: flex; gap: 14px; align-items: center; font-size: 15px; box-shadow: 0 8px 30px rgba(0,0,0,0.25); }
+  .toast button { border: 0; background: none; color: #f2c4a8; font: 600 15px 'Archivo', system-ui, sans-serif; text-decoration: underline; cursor: pointer; padding: 4px; }
+  .deleted-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 0 14px; padding: 12px 16px; border: 1px solid rgba(155,44,31,0.3); background: #fbf1ee; border-radius: 8px; }
+  .deleted-head p { margin: 0; flex: 1 1 280px; font-size: 14px; color: var(--muted); }
+  .tbtn.danger { color: #9b2c1f; border-color: rgba(155,44,31,0.45); }
+  .tbtn.danger.armed { background: #9b2c1f; border-color: #9b2c1f; color: #fff; }
+  @media (max-width: 560px) { .selbar .count { flex-basis: 100%; } .grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; } }
+  .more { display: flex; justify-content: center; margin-top: 20px; }
+  .msg { margin: 60px auto; max-width: 520px; text-align: center; font-family: 'Cormorant Garamond', serif; font-size: 22px; }
+  .empty { margin: 40px 0; text-align: center; color: var(--muted); }
+
+  dialog { width: min(1100px, 96vw); max-height: 94vh; padding: 0; border: 0; border-radius: 10px; background: var(--paper); color: var(--ink); }
+  dialog::backdrop { background: rgba(10,14,22,0.72); }
+  .lb { display: grid; grid-template-columns: 1fr; }
+  @media (min-width: 860px) { .lb { grid-template-columns: 1fr 300px; } }
+  .lb-img { position: relative; background: #111; display: flex; align-items: center; justify-content: center; min-height: 50vh; max-height: 94vh; }
+  .lb-img img { max-width: 100%; max-height: 94vh; object-fit: contain; display: block; }
+  .lb-img video { max-width: 100%; max-height: 94vh; display: block; background: #000; }
+  .lb-side { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+  .lb-side h2 { margin: 0; font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 600; }
+  .lb-side p { margin: 0; font-size: 14px; color: var(--muted); word-break: break-all; }
+  .lb-side p.note { word-break: normal; }
+  .lb-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+  .abtn { display: flex; align-items: center; justify-content: center; min-height: 44px; border-radius: 6px; font: 600 15px 'Archivo', system-ui, sans-serif; text-decoration: none; cursor: pointer; border: 1px solid rgba(29,36,51,0.25); background: #fff; color: var(--ink); }
+  .abtn.primary { background: var(--forest); border-color: var(--forest); color: var(--cream); }
+  .abtn.album { border-color: #2e8b57; color: #1f6b41; }
+  .abtn.album.in { background: #2e8b57; color: #fff; }
+  .abtn.danger { color: #9b2c1f; border-color: rgba(155,44,31,0.45); }
+  .abtn.danger.armed { background: #9b2c1f; border-color: #9b2c1f; color: #fff; }
+  .abtn:disabled { opacity: 0.6; cursor: default; }
+  .keys { font-size: 12px; color: var(--muted); }
+  .vids { margin-top: 36px; }
+  .vid-list { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
+  .vid-list li { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 10px 2px; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .vid-list b { font-weight: 600; min-width: 140px; }
+  .vid-list span { color: var(--muted); }
+  .nav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(251,249,243,0.9); color: var(--ink); font-size: 22px; cursor: pointer; }
+  .nav.prev { left: 10px; } .nav.next { right: 10px; }
+  .close { position: absolute; top: 10px; right: 10px; width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(251,249,243,0.9); font-size: 20px; cursor: pointer; }
+  .note { font-size: 13px; color: var(--muted); }
+  .linkbtn { border: 0; background: none; padding: 0; color: var(--forest); font: inherit; text-decoration: underline; cursor: pointer; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="/" aria-label="Lisa &amp; Pete — wedding home">L <span>&amp;</span> P</a>
+    <span class="who" id="who-am-i">Private · for Lisa &amp; Pete</span>
+  </div>
+</header>
+<main id="app">
+  <div class="eyebrow">Guest photos &amp; videos</div>
+  <h1>Lisa &amp; Pete</h1>
+  <div class="stats" id="stats"></div>
+
+  <div class="albumbox" id="albumbox">
+    <span class="state"><span class="dot" aria-hidden="true"></span><span id="albumState">Public album: off</span></span>
+    <span class="hint" id="albumHint"></span>
+    <button class="tbtn" id="albumToggle" type="button">Turn on</button>
+    <a class="tbtn" id="albumOpen" href="/photos/album/" target="_blank" rel="noopener">Open album</a>
+  </div>
+
+  <details class="booth" id="booth">
+    <summary>
+      <span>📸 Photobooth</span>
+      <span class="pill"><span class="led" id="ledBooth"></span><span id="sumBooth">iPad: …</span></span>
+      <span class="pill"><span class="led" id="ledPrint"></span><span id="sumPrint">Printers: …</span></span>
+      <span class="chev" id="boothChev">Show</span>
+    </summary>
+    <h3>Printing</h3>
+    <div class="seg" id="printMode" role="group" aria-label="Printer switch"></div>
+    <p class="boothnote" id="modeNote"></p>
+    <div class="printers" id="printers"></div>
+    <h3>Booth iPad</h3>
+    <div class="boothrow">
+      <button class="tbtn" id="camReset" type="button">⟳ Reset booth camera</button>
+      <button class="tbtn" id="boothReload" type="button">↻ Reload booth</button>
+    </div>
+    <p class="boothnote" id="boothNote">Fixes a sideways, stretched or blurry picture without touching the iPad. It waits until no guest is mid-session.</p>
+    <h3>Recent prints</h3>
+    <table class="jobs"><tbody id="jobs"></tbody></table>
+    <p class="boothnote">"Done" means the Mac handed the sheet to that printer; check the printer for the physical print. If a sheet is stuck in a jammed printer, use "Reprint on" the other one.</p>
+  </details>
+
+  <div class="tools">
+    <select id="filter" aria-label="Which photos">
+      <option value="all">All photos</option>
+      <option value="unapproved">Not in the album yet</option>
+      <option value="approved">In the album</option>
+      <option value="videos">Videos</option>
+      <option value="private">Family only (private)</option>
+      <option value="hidden">Hidden</option>
+      <option value="outtakes">Removed by guests</option>
+      <option value="deleted">Deleted</option>
+    </select>
+    <select id="who" aria-label="Show photos from"><option value="">Everyone</option></select>
+    <button class="tbtn" id="refresh" type="button">Refresh</button>
+    <button class="tbtn" id="selAll" type="button" hidden>Select all shown</button>
+    <button class="tbtn" id="bulk" type="button" hidden>Add all shown to album</button>
+  </div>
+  <div class="deleted-head" id="deletedHead" hidden>
+    <p>Deleted photos are out of the album and every other list, but nothing is gone yet. Restore puts a photo back as it was. Delete forever removes the file for good.</p>
+    <button class="tbtn danger" id="emptyDeleted" type="button">Empty Deleted</button>
+  </div>
+  <div class="grid" id="grid"></div>
+  <p class="empty" id="empty" hidden>No photos here.</p>
+  <div class="more"><button class="tbtn" id="more" type="button" hidden>Load more</button></div>
+  <div class="selbar" id="selbar" hidden>
+    <span class="count" id="selCount">0 selected</span>
+    <button class="sbtn album" id="sAlbum" type="button">Add to album</button>
+    <button class="sbtn" id="sUnalbum" type="button">Remove from album</button>
+    <button class="sbtn" id="sHide" type="button">Hide</button>
+    <button class="sbtn" id="sUnhide" type="button">Unhide</button>
+    <button class="sbtn danger" id="sDelete" type="button">Delete</button>
+    <button class="sbtn album" id="sRestore" type="button">Restore</button>
+    <button class="sbtn danger" id="sPurge" type="button">Delete forever</button>
+    <button class="sbtn" id="sClear" type="button">Clear</button>
+  </div>
+  <p class="note">Tap the circle on a photo to select it (shift-click on a computer selects a run of photos), then pick an action. Only photos and videos you add to the album are public, and only while the album is on. Anything a guest marked "family only" can't go in the album. Hide keeps a photo out of the album. Delete moves a photo to Deleted, where you can restore it or delete it forever. Photos a guest removes stay under "Removed by guests". Photo links on this page expire after two hours; Refresh renews them. <button class="linkbtn" id="forget" type="button">Sign out on this device</button></p>
+  <section id="vids" class="vids" hidden>
+    <div class="eyebrow">Video links &amp; requests</div>
+    <p class="note">Links guests pasted for videos too big to upload (open one to download it), and anyone who left an email or phone on the wedding night asking for a video link — videos upload on the photo page now, so you can point them there.</p>
+    <ul id="vidList" class="vid-list"></ul>
+  </section>
+</main>
+
+<dialog id="lb" aria-label="Photo">
+  <div class="lb">
+    <div class="lb-img">
+      <img id="lbImg" alt="">
+      <video id="lbVid" controls playsinline preload="metadata" hidden></video>
+      <button class="nav prev" id="prev" type="button" aria-label="Previous photo">‹</button>
+      <button class="nav next" id="next" type="button" aria-label="Next photo">›</button>
+      <button class="close" id="close" type="button" aria-label="Close" autofocus>×</button>
+    </div>
+    <div class="lb-side">
+      <h2 id="lbWho"></h2>
+      <p id="lbWhen"></p>
+      <p id="lbName"></p>
+      <p id="lbHeic" class="note" hidden>This is an iPhone HEIC file; your browser shows a preview. Download it for full quality.</p>
+      <p id="lbOut" class="note" hidden>The guest removed this photo. It stays here, out of the album.</p>
+      <p id="lbPriv" class="note" hidden>The guest sent this just for the family. It can't go in the album.</p>
+      <div class="lb-actions">
+        <button class="abtn album" id="lbAlbum" type="button">Add to album</button>
+        <a class="abtn primary" id="lbDownload" href="#" download>Download original</a>
+        <button class="abtn" id="lbHide" type="button">Hide</button>
+        <button class="abtn danger" id="lbDelete" type="button">Delete</button>
+        <button class="abtn album" id="lbRestore" type="button" hidden>Restore</button>
+        <button class="abtn danger" id="lbPurge" type="button" hidden>Delete forever</button>
+      </div>
+      <p id="lbDel" class="note" hidden></p>
+      <p class="keys" id="lbKeys">Keys: ← → next photo · A album · H hide · D delete</p>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(() => {
+  'use strict';
+  const API = 'https://hseupjbneifqxaykxltt.supabase.co/functions/v1/api';
+  const DEFAULT_EVENT = 'bf4d479a7b1c16d5b088ede0';
+  const $ = (id) => document.getElementById(id);
+  // Links get pasted into texts and emails: take the key itself and ignore anything an app
+  // tacks on (a trailing period, a closing bracket, uppercase from autocorrect).
+  const hex = (v) => ((v || '').match(/[a-f0-9]{16,64}/i) || [''])[0].toLowerCase();
+  const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const query = new URLSearchParams(location.search);
+  const EVENT = hex(hash.get('e') || query.get('e')) || DEFAULT_EVENT;
+  const KEY_STORE = 'lp-admin-owner-' + EVENT.slice(0, 8);
+  const store = {
+    get() { try { return localStorage.getItem(KEY_STORE); } catch (e) { return null; } },
+    set(v) { try { localStorage.setItem(KEY_STORE, v); } catch (e) { /* private mode */ } },
+    clear() { try { localStorage.removeItem(KEY_STORE); } catch (e) { /* private mode */ } },
+  };
+  // The key can come from #k=… (preferred: never sent to the server), ?owner=… or ?k=…, or
+  // from an earlier visit on this device. A key in the address is saved, then wiped from it.
+  const fromUrl = hex(hash.get('k')) || hex(query.get('owner')) || hex(query.get('k'));
+  const OWNER = fromUrl || hex(store.get());
+  if (fromUrl) {
+    store.set(fromUrl);
+    const keepE = EVENT !== DEFAULT_EVENT ? '?e=' + EVENT : '';
+    try { history.replaceState(null, '', location.pathname + keepE); } catch (e) { /* fine */ }
+  }
+  // Pasting a #k= link into a tab already on this page changes only the hash, which doesn't
+  // reload the page; reload so the new key is picked up.
+  window.addEventListener('hashchange', () => { if (/(^|[#&])(k|e)=/.test(location.hash)) location.reload(); });
+  if (EVENT !== DEFAULT_EVENT) $('albumOpen').href = '/photos/album/?e=' + EVENT;
+
+  if (!/^[a-f0-9]{16,64}$/.test(OWNER)) {
+    $('app').textContent = '';
+    const p = document.createElement('p'); p.className = 'msg';
+    p.textContent = 'This page needs your admin link. Open it once from the email Pete sent you; after that, this device remembers it.';
+    $('app').appendChild(p);
+    return;
+  }
+  $('forget').addEventListener('click', () => { store.clear(); location.replace(location.pathname); });
+
+  // Busy-server (5xx/429) and dropped-connection errors are retried with backoff.
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function api(action, extra) {
+    let last = null;
+    for (let a = 0; a < 4; a++) {
+      if (a) await sleep(600 * Math.pow(2, a - 1) + Math.random() * 300);
+      let res;
+      try {
+        res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.assign({ e: EVENT, owner: OWNER, action }, extra || {})) });
+      } catch (e) { last = new Error('network'); continue; }
+      let d = null; try { d = await res.json(); } catch (e) { /* not json */ }
+      if (res.ok && d && d.ok) return d;
+      const err = new Error((d && d.error) || ('HTTP ' + res.status));
+      if (res.status >= 500 || res.status === 429) { last = err; continue; }
+      throw err;
+    }
+    throw last || new Error('network');
+  }
+
+  const PAGE = 300;
+  let items = [], total = 0, offset = 0, view = [], current = -1;
+  let albumPublic = false, approvedCount = 0, deletedCount = 0;
+  const selected = new Set(); // uploadIds
+  let lastPick = -1;          // index in view of the last circle tapped (shift-click range)
+
+  const mb = (n) => (n / 1048576).toFixed(n > 1048576 * 100 ? 0 : 1) + ' MB';
+  const when = (iso) => { try { return new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch (e) { return iso; } };
+  const isHeic = (it) => /heic|heif/i.test(it.type || '') || /\.(heic|heif)$/i.test(it.name || '');
+  const nameOf = (c) => (c && c !== '(no name)') ? c : 'Anonymous';
+  const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+  const inDeleted = () => $('filter').value === 'deleted';
+  const fmtDur = (s) => { s = Math.round(Number(s) || 0); if (!s) return ''; return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+
+  function stat(label, value, onClick) {
+    const d = document.createElement(onClick ? 'button' : 'div'); d.className = 'stat' + (onClick ? ' link' : '');
+    if (onClick) { d.type = 'button'; d.addEventListener('click', onClick); }
+    const b = document.createElement('b'); b.textContent = value;
+    const s = document.createElement('span'); s.textContent = label;
+    d.append(b, s); return d;
+  }
+  function showFilter(v) { $('filter').value = v; loadPage(true).catch(() => alertMsg('Could not load those photos.')); }
+
+  function showAlbum() {
+    $('albumbox').classList.toggle('on', albumPublic);
+    $('albumState').textContent = 'Public album: ' + (albumPublic ? 'on' : 'off');
+    $('albumHint').textContent = albumPublic
+      ? 'Anyone with the album link sees ' + plural(approvedCount, 'photo', 'photos') + '.'
+      : 'Guests see nothing yet. Add photos to the album, then turn it on. ' + plural(approvedCount, 'photo is', 'photos are') + ' ready.';
+    disarmAlbum();
+  }
+
+  async function loadStatus() {
+    const s = await api('status');
+    const c = s.counts || {};
+    albumPublic = !!s.albumPublic;
+    approvedCount = Number(c.approved) || 0;
+    deletedCount = Number(c.deleted) || 0;
+    if (s.admin && s.admin !== 'Owner') $('who-am-i').textContent = 'Signed in as ' + s.admin;
+    const st = $('stats'); st.textContent = '';
+    st.append(stat('received', String((c.received || 0) - (c.outtakes || 0))),
+              stat('in the album', String(approvedCount), () => showFilter('approved')),
+              stat('guests', String(Object.keys(s.contributors || {}).filter((k) => k !== '(no name)').length)),
+              stat('stored', mb(c.totalBytes || 0)),
+              stat('hidden', String(c.hidden || 0), () => showFilter('hidden')));
+    if (c.videos) st.append(stat('videos', String(c.videos), () => showFilter('videos')));
+    if (c.private) st.append(stat('family only', String(c.private), () => showFilter('private')));
+    if (c.outtakes) st.append(stat('removed by guests', String(c.outtakes), () => showFilter('outtakes')));
+    st.append(stat('deleted', String(deletedCount), () => showFilter('deleted')));
+    if (c.pending) st.append(stat('still arriving', String(c.pending)));
+    showAlbum();
+    const sel = $('who'), keep = sel.value;
+    sel.textContent = '';
+    const all = document.createElement('option'); all.value = ''; all.textContent = 'Everyone'; sel.appendChild(all);
+    Object.entries(s.contributors || {}).sort((a, b) => b[1] - a[1]).forEach(([name, n]) => {
+      const o = document.createElement('option'); o.value = name; o.textContent = nameOf(name) + ' (' + n + ')'; sel.appendChild(o);
+    });
+    sel.value = keep;
+    if (sel.selectedIndex < 0) sel.value = ''; // that guest has no photos left
+    const vids = s.videos || [];
+    $('vids').hidden = vids.length === 0;
+    const list = $('vidList'); list.textContent = '';
+    for (const v of vids) {
+      const li = document.createElement('li');
+      const b = document.createElement('b'); b.textContent = nameOf(v.name);
+      const c2 = document.createElement('span'); c2.textContent = v.contact || '';
+      const t = document.createElement('span'); t.textContent = when(v.at);
+      li.append(b);
+      if (v.link) {
+        const a = document.createElement('a'); a.href = v.link; a.target = '_blank'; a.rel = 'noopener noreferrer';
+        a.textContent = v.link.replace(/^https?:\/\//, '').slice(0, 60) + (v.link.length > 68 ? '…' : '');
+        li.append(a);
+      }
+      if (v.contact) li.append(c2);
+      li.append(t); list.appendChild(li);
+    }
+  }
+
+  // Only the newest request draws the grid: switching filters quickly (arrow keys on the
+  // dropdown fire a change per step) must not mix two answers or show an older one.
+  let loadSeq = 0;
+  async function loadPage(reset) {
+    const seq = ++loadSeq;
+    const from = reset ? 0 : offset;
+    if (reset) { $('more').hidden = true; selected.clear(); lastPick = -1; }
+    const g = await api('gallery', { offset: from, limit: PAGE, filter: $('filter').value, includeHidden: true });
+    if (seq !== loadSeq) return;
+    items = (reset ? [] : items).concat(g.items || []);
+    total = g.total || items.length;
+    offset = from + (Number(g.limit) || PAGE);
+    $('more').hidden = !g.truncated;
+    render();
+  }
+
+  function render() {
+    const who = $('who').value;
+    view = items.filter((it) => !who || (it.contributor || '(no name)') === who);
+    const ids = new Set(view.map((it) => it.uploadId));
+    for (const id of [...selected]) if (!ids.has(id)) selected.delete(id);
+    const grid = $('grid'); grid.textContent = '';
+    $('empty').hidden = view.length > 0;
+    $('empty').textContent = inDeleted() ? 'Nothing in Deleted.' : 'Nothing here.';
+    $('deletedHead').hidden = !inDeleted() || view.length === 0;
+    disarmEmpty();
+    view.forEach((it, idx) => {
+      const tile = document.createElement('div');
+      const isVid = it.kind === 'video';
+      tile.className = 'tile' + (it.hidden ? ' is-hidden' : '') + (it.outtake ? ' is-outtake' : '') + (isVid ? ' is-video' : '') + (selected.has(it.uploadId) ? ' sel' : '');
+      tile.dataset.id = it.uploadId;
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'open';
+      b.setAttribute('aria-label', 'Open ' + (isVid ? 'video' : 'photo') + ' from ' + nameOf(it.contributor) + (it.approved ? ', in the album' : '') + (it.private ? ', family only' : ''));
+      const src = it.thumbUrl || (!isHeic(it) && !isVid ? it.url : null);
+      if (src) { const img = document.createElement('img'); img.src = src; img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; b.appendChild(img); }
+      else { const ph = document.createElement('div'); ph.className = 'ph'; ph.textContent = (isVid ? '▶ ' : '') + it.name; b.appendChild(ph); }
+      const tags = document.createElement('div'); tags.className = 'tags';
+      const tag = (cls, text) => { const s = document.createElement('span'); s.className = cls; s.textContent = text; tags.appendChild(s); };
+      if (isVid) tag('t-vid', '▶ ' + (fmtDur(it.duration) || 'video'));
+      if (it.private) tag('t-priv', '🔒 Family only');
+      if (it.deleted) tag('t-del', 'Deleted');
+      else {
+        if (it.approved && !it.hidden && !it.outtake) tag('t-album', 'In album');
+        if (it.hidden) tag('t-hidden', 'Hidden');
+        if (it.outtake) tag('t-out', 'Removed by guest');
+      }
+      const cap = document.createElement('span'); cap.className = 'cap';
+      cap.textContent = nameOf(it.contributor) + (it.deleted && it.deletedAt ? ' · deleted ' + when(it.deletedAt) : '');
+      b.append(tags, cap);
+      // Once anything is selected, tapping a photo selects it too (like a phone's photo app).
+      b.addEventListener('click', (e) => { if (selected.size) pick(idx, e.shiftKey); else open(idx); });
+      const chk = document.createElement('button'); chk.type = 'button'; chk.className = 'chk';
+      chk.setAttribute('aria-pressed', String(selected.has(it.uploadId)));
+      chk.setAttribute('aria-label', 'Select photo from ' + nameOf(it.contributor));
+      chk.addEventListener('click', (e) => { e.stopPropagation(); pick(idx, e.shiftKey); });
+      tile.append(b, chk);
+      grid.appendChild(tile);
+    });
+    disarmBulk(view.filter((it) => !it.approved && !it.hidden && !it.outtake && !it.private).length);
+    showSelection();
+  }
+
+  // ---------- selection ----------
+  function pick(idx, range) {
+    const it = view[idx]; if (!it) return;
+    const want = !selected.has(it.uploadId);
+    const [a, b] = range && lastPick >= 0 ? [Math.min(lastPick, idx), Math.max(lastPick, idx)] : [idx, idx];
+    for (let i = a; i <= b; i++) { const x = view[i]; if (x) want ? selected.add(x.uploadId) : selected.delete(x.uploadId); }
+    lastPick = idx;
+    // update tiles in place (re-rendering would reload every thumbnail)
+    for (const t of $('grid').children) {
+      const on = selected.has(t.dataset.id);
+      t.classList.toggle('sel', on);
+      t.querySelector('.chk').setAttribute('aria-pressed', String(on));
+    }
+    showSelection();
+  }
+  function selItems() { return view.filter((it) => selected.has(it.uploadId)); }
+  function showSelection() {
+    const sel = selItems(), n = sel.length, del = inDeleted(), out = $('filter').value === 'outtakes';
+    $('selbar').hidden = n === 0;
+    $('selAll').hidden = view.length === 0;
+    $('selAll').textContent = n && n === view.length ? 'Clear selection' : 'Select all shown';
+    const addable = view.filter((it) => !it.approved && !it.hidden && !it.outtake && !it.private).length;
+    $('bulk').hidden = n > 0 || del || addable === 0;
+    $('selCount').textContent = plural(n, 'photo', 'photos') + ' selected';
+    const cnt = (f) => sel.filter(f).length;
+    // An action that would change none of the selected photos is left out of the bar.
+    const set = (id, show, label, k) => { const b = $(id); b.hidden = !show || !k; b.textContent = label + (k && k !== n ? ' (' + k + ')' : ''); b.disabled = !k; };
+    const toAlbum = cnt((it) => !it.approved && !it.hidden && !it.outtake && !it.private);
+    const fromAlbum = cnt((it) => it.approved);
+    const toHide = cnt((it) => !it.hidden && !it.outtake);
+    const toUnhide = cnt((it) => it.hidden);
+    set('sAlbum', !del && !out, 'Add to album', toAlbum);
+    set('sUnalbum', !del && !out, 'Remove from album', fromAlbum);
+    set('sHide', !del && !out, 'Hide', toHide);
+    set('sUnhide', !del && !out, 'Unhide', toUnhide);
+    set('sDelete', !del, 'Delete', n);
+    set('sRestore', del, 'Restore', n);
+    set('sPurge', del, 'Delete forever', n);
+    if (!busyBulk) disarmPurge();
+  }
+  $('selAll').addEventListener('click', () => {
+    if (selected.size && selected.size === view.length) selected.clear();
+    else view.forEach((it) => selected.add(it.uploadId));
+    lastPick = -1; render();
+  });
+  $('sClear').addEventListener('click', () => { selected.clear(); lastPick = -1; render(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('lb').open && selected.size) { selected.clear(); render(); } });
+
+  // Runs an action over many photos, 500 at a time (the server's batch limit).
+  async function chunked(action, ids, extra) {
+    const done = [];
+    for (let i = 0; i < ids.length; i += 500) {
+      await api(action, Object.assign({ uploadIds: ids.slice(i, i + 500) }, extra || {}));
+      done.push(...ids.slice(i, i + 500));
+    }
+    return done;
+  }
+  let busyBulk = false;
+  async function runBulk(btn, label, fn) {
+    if (busyBulk) return;
+    busyBulk = true;
+    const bar = [...$('selbar').querySelectorAll('button')];
+    bar.forEach((b) => { b.disabled = true; });
+    btn.textContent = label;
+    try { await fn(); }
+    catch (e) { alertMsg('Something did not go through. Refresh and check.'); loadPage(true).catch(() => {}); }
+    finally { busyBulk = false; render(); loadStatus().catch(() => {}); }
+  }
+  // Photos that leave this list (deleted, restored, purged, or no longer matching the filter).
+  function dropFromList(ids) {
+    const gone = new Set(ids);
+    const before = items.length;
+    items = items.filter((x) => !gone.has(x.uploadId));
+    const n = before - items.length;
+    total = Math.max(0, total - n); offset = Math.max(0, offset - n);
+    for (const id of ids) selected.delete(id);
+  }
+  // After album/hide changes, photos that no longer belong in the chosen filter leave it.
+  function fitsFilter(it) {
+    const f = $('filter').value;
+    if (f === 'approved') return it.approved && !it.hidden;
+    if (f === 'unapproved') return !it.approved && !it.hidden;
+    if (f === 'hidden') return it.hidden;
+    if (f === 'videos') return it.kind === 'video';
+    if (f === 'private') return !!it.private;
+    return true;
+  }
+  function setFlag(ids, key, val) {
+    const set = new Set(ids);
+    for (const it of items) if (set.has(it.uploadId)) it[key] = val;
+    dropFromList(items.filter((it) => set.has(it.uploadId) && !fitsFilter(it)).map((it) => it.uploadId));
+    for (const id of ids) selected.delete(id);
+  }
+
+  $('sAlbum').addEventListener('click', () => runBulk($('sAlbum'), 'Adding…', async () => {
+    const ids = selItems().filter((it) => !it.approved && !it.hidden && !it.outtake && !it.private).map((it) => it.uploadId);
+    await chunked('approve', ids, { approved: true }); setFlag(ids, 'approved', true);
+    toast('Added ' + plural(ids.length, 'photo', 'photos') + ' to the album.');
+  }));
+  $('sUnalbum').addEventListener('click', () => runBulk($('sUnalbum'), 'Removing…', async () => {
+    const ids = selItems().filter((it) => it.approved).map((it) => it.uploadId);
+    await chunked('approve', ids, { approved: false }); setFlag(ids, 'approved', false);
+    toast('Took ' + plural(ids.length, 'photo', 'photos') + ' out of the album.');
+  }));
+  $('sHide').addEventListener('click', () => runBulk($('sHide'), 'Hiding…', async () => {
+    const ids = selItems().filter((it) => !it.hidden && !it.outtake).map((it) => it.uploadId);
+    await chunked('hide', ids, { hidden: true }); setFlag(ids, 'hidden', true);
+    toast('Hid ' + plural(ids.length, 'photo', 'photos') + '.', () => undo('hide', ids, { hidden: false }));
+  }));
+  $('sUnhide').addEventListener('click', () => runBulk($('sUnhide'), 'Unhiding…', async () => {
+    const ids = selItems().filter((it) => it.hidden).map((it) => it.uploadId);
+    await chunked('hide', ids, { hidden: false }); setFlag(ids, 'hidden', false);
+    toast('Unhid ' + plural(ids.length, 'photo', 'photos') + '.');
+  }));
+  $('sDelete').addEventListener('click', () => runBulk($('sDelete'), 'Deleting…', async () => {
+    const ids = selItems().map((it) => it.uploadId);
+    await chunked('delete', ids); dropFromList(ids);
+    toast('Moved ' + plural(ids.length, 'photo', 'photos') + ' to Deleted.', () => undo('restore', ids));
+  }));
+  $('sRestore').addEventListener('click', () => runBulk($('sRestore'), 'Restoring…', async () => {
+    const ids = selItems().map((it) => it.uploadId);
+    await chunked('restore', ids); dropFromList(ids);
+    toast('Restored ' + plural(ids.length, 'photo', 'photos') + '.');
+  }));
+  // Delete forever: first click arms, second click within 5 s deletes.
+  let purgeArm = null;
+  function disarmPurge() { clearTimeout(purgeArm); $('sPurge').classList.remove('armed'); }
+  $('sPurge').addEventListener('click', () => {
+    const b = $('sPurge'), n = selected.size;
+    if (!b.classList.contains('armed')) {
+      b.classList.add('armed'); b.textContent = 'Delete ' + plural(n, 'photo', 'photos') + ' forever?';
+      purgeArm = setTimeout(() => { disarmPurge(); showSelection(); }, 5000);
+      return;
+    }
+    disarmPurge();
+    runBulk(b, 'Deleting…', async () => {
+      const ids = selItems().map((it) => it.uploadId);
+      await chunked('purge', ids); dropFromList(ids);
+      toast('Deleted ' + plural(ids.length, 'photo', 'photos') + ' for good.');
+    });
+  });
+  async function undo(action, ids, extra) {
+    try { await chunked(action, ids, extra); } catch (e) { alertMsg('Could not undo. Refresh and check.'); }
+    loadPage(true).catch(() => {}); loadStatus().catch(() => {});
+  }
+
+  // Empty Deleted: arms, then purges everything in Deleted (the server does 500 per call).
+  let emptyArm = null;
+  function disarmEmpty() { clearTimeout(emptyArm); const b = $('emptyDeleted'); b.classList.remove('armed'); b.disabled = false; b.textContent = 'Empty Deleted'; }
+  $('emptyDeleted').addEventListener('click', async () => {
+    const b = $('emptyDeleted');
+    if (!b.classList.contains('armed')) {
+      b.classList.add('armed'); b.textContent = 'Delete all ' + plural(deletedCount || total, 'photo', 'photos') + ' forever?';
+      emptyArm = setTimeout(disarmEmpty, 6000);
+      return;
+    }
+    clearTimeout(emptyArm);
+    b.disabled = true; b.textContent = 'Deleting…';
+    try {
+      for (let i = 0; i < 40; i++) { const d = await api('purge', { all: true }); if (!d.more) break; }
+      toast('Deleted is empty.');
+    } catch (e) { alertMsg('Could not empty Deleted. Try again.'); }
+    loadPage(true).catch(() => {}); loadStatus().catch(() => {});
+  });
+
+  // ---------- viewer ----------
+  function open(idx) {
+    current = idx;
+    const it = view[idx]; if (!it) return;
+    const img = $('lbImg'), vid = $('lbVid');
+    if (it.kind === 'video') {
+      img.hidden = true; img.removeAttribute('src');
+      vid.hidden = false;
+      if (vid.dataset.id !== it.uploadId) { vid.pause(); vid.poster = it.thumbUrl || ''; vid.src = it.url; vid.dataset.id = it.uploadId; vid.load(); }
+    } else {
+      vid.pause(); vid.hidden = true;
+      img.hidden = false;
+      img.src = isHeic(it) ? (it.thumbUrl || '') : it.url;
+      img.alt = 'Photo from ' + nameOf(it.contributor);
+    }
+    $('lbWho').textContent = nameOf(it.contributor) + (it.private ? ' · family only' : '');
+    disarm();
+    $('lbWhen').textContent = when(it.at) + ' · ' + mb(it.bytes || 0) + (it.kind === 'video' && it.duration ? ' · ' + fmtDur(it.duration) : '');
+    $('lbName').textContent = it.name;
+    $('lbHeic').hidden = !isHeic(it);
+    $('lbPriv').hidden = !it.private;
+    $('lbOut').hidden = !it.outtake || it.deleted;
+    $('lbDownload').href = it.downloadUrl || it.url;
+    const del = !!it.deleted;
+    $('lbDel').hidden = !del;
+    $('lbDel').textContent = del ? 'In Deleted since ' + when(it.deletedAt) + '. Restore puts it back as it was.' : '';
+    $('lbRestore').hidden = !del;
+    $('lbPurge').hidden = !del;
+    $('lbDelete').hidden = del;
+    $('lbKeys').textContent = del ? 'Keys: ← → next photo · R restore' : 'Keys: ← → next photo · A album · H hide · D delete';
+    $('lbHide').textContent = it.hidden ? 'Unhide' : 'Hide';
+    $('lbHide').hidden = !!it.outtake || del;
+    const ab = $('lbAlbum');
+    ab.hidden = !!it.outtake || del;
+    ab.disabled = !!it.hidden || !!it.private;
+    ab.classList.toggle('in', !!it.approved);
+    ab.textContent = it.private ? 'Family only — stays out of the album' : it.hidden ? 'Hidden photos stay out of the album' : (it.approved ? '✓ In the album — remove' : 'Add to album');
+    if (!$('lb').open) $('lb').showModal();
+  }
+  function step(d) { if (view.length) open((current + d + view.length) % view.length); }
+  // After a photo leaves the list, show the one that took its place (or close if none are left).
+  function afterRemove() {
+    render();
+    if (view.length) open(Math.min(current, view.length - 1)); else $('lb').close();
+    loadStatus().catch(() => {});
+  }
+
+  let busy = false; // one album/hide change at a time
+  async function toggleAlbum() {
+    const it = view[current]; if (busy || !it || it.hidden || it.outtake || it.deleted || it.private) return;
+    const want = !it.approved;
+    busy = true; $('lbAlbum').disabled = true;
+    try {
+      await api('approve', { uploadIds: [it.uploadId], approved: want });
+      it.approved = want;
+      approvedCount = Math.max(0, approvedCount + (want ? 1 : -1));
+      render(); open(current); showAlbum();
+      loadStatus().catch(() => {}); // keep the "in the album" count in step
+    } catch (e) { alertMsg('Could not update the album. Try again.'); }
+    finally { busy = false; $('lbAlbum').disabled = !!(view[current] && (view[current].hidden || view[current].private)); }
+  }
+  async function toggleHide() {
+    const it = view[current]; if (busy || !it || it.outtake || it.deleted) return;
+    const want = !it.hidden;
+    busy = true; $('lbHide').disabled = true;
+    try { await api('hide', { uploadId: it.uploadId, hidden: want }); it.hidden = want; render(); open(current); loadStatus().catch(() => {}); }
+    catch (e) { alertMsg('Could not update that photo. Try again.'); }
+    finally { busy = false; $('lbHide').disabled = false; }
+  }
+  // Delete = move to Deleted (undoable), so no confirmation step.
+  async function softDelete() {
+    const it = view[current]; if (busy || !it || it.deleted) return;
+    busy = true; $('lbDelete').disabled = true; $('lbDelete').textContent = 'Deleting…';
+    try {
+      await api('delete', { uploadIds: [it.uploadId] });
+      dropFromList([it.uploadId]);
+      toast('Moved to Deleted.', () => undo('restore', [it.uploadId]));
+      afterRemove();
+    } catch (e) { alertMsg('Could not delete that photo. Try again.'); }
+    finally { busy = false; disarm(); }
+  }
+  async function restoreOne() {
+    const it = view[current]; if (busy || !it || !it.deleted) return;
+    busy = true; $('lbRestore').disabled = true;
+    try { await api('restore', { uploadIds: [it.uploadId] }); dropFromList([it.uploadId]); toast('Restored.'); afterRemove(); }
+    catch (e) { alertMsg('Could not restore that photo. Try again.'); }
+    finally { busy = false; $('lbRestore').disabled = false; }
+  }
+  $('lbAlbum').addEventListener('click', toggleAlbum);
+  $('lbHide').addEventListener('click', toggleHide);
+  $('lbDelete').addEventListener('click', softDelete);
+  $('lbRestore').addEventListener('click', restoreOne);
+  $('prev').addEventListener('click', () => step(-1));
+  $('next').addEventListener('click', () => step(1));
+  $('close').addEventListener('click', () => $('lb').close());
+  // Keys work wherever focus is (a button that was just disabled drops focus to the page).
+  document.addEventListener('keydown', (e) => {
+    if (!$('lb').open || e.metaKey || e.ctrlKey || e.altKey || e.target === $('lbVid')) return;
+    const k = e.key.toLowerCase();
+    if (e.key === 'ArrowLeft') step(-1);
+    else if (e.key === 'ArrowRight') step(1);
+    else if (k === 'a') toggleAlbum();
+    else if (k === 'h') toggleHide();
+    else if (k === 'd') softDelete();
+    else if (k === 'r') restoreOne();
+  });
+  $('lb').addEventListener('click', (e) => { if (e.target === $('lb')) $('lb').close(); });
+
+  // Delete forever (only from Deleted): first click arms, second click within 5 s deletes.
+  let armTimer = null;
+  function disarm() {
+    clearTimeout(armTimer);
+    const d = $('lbDelete'); d.disabled = false; d.textContent = 'Delete';
+    const b = $('lbPurge'); b.classList.remove('armed'); b.textContent = 'Delete forever'; b.disabled = false;
+  }
+  $('lbPurge').addEventListener('click', async () => {
+    const b = $('lbPurge');
+    const it = view[current]; if (!it || !it.deleted) return;
+    if (!b.classList.contains('armed')) {
+      b.classList.add('armed'); b.textContent = 'Delete for good? This can’t be undone';
+      armTimer = setTimeout(disarm, 5000);
+      return;
+    }
+    clearTimeout(armTimer);
+    b.disabled = true; b.textContent = 'Deleting…';
+    try { await api('purge', { uploadIds: [it.uploadId] }); dropFromList([it.uploadId]); afterRemove(); }
+    catch (e) { alertMsg('Could not delete that photo. Try again.'); }
+    disarm();
+  });
+  $('lb').addEventListener('close', () => { disarm(); $('lbVid').pause(); });
+
+  // ---------- album on/off (turning it on takes a second click) ----------
+  let albumArm = null;
+  function disarmAlbum() {
+    clearTimeout(albumArm);
+    const b = $('albumToggle');
+    b.classList.remove('armed'); b.disabled = false;
+    b.textContent = albumPublic ? 'Turn off' : 'Turn on';
+  }
+  $('albumToggle').addEventListener('click', async () => {
+    const b = $('albumToggle');
+    if (!albumPublic && !b.classList.contains('armed')) {
+      b.classList.add('armed');
+      b.textContent = 'Show ' + plural(approvedCount, 'photo', 'photos') + ' to guests?';
+      albumArm = setTimeout(disarmAlbum, 6000);
+      return;
+    }
+    clearTimeout(albumArm);
+    b.disabled = true;
+    try {
+      const d = await api('album_visibility', { public: !albumPublic });
+      albumPublic = !!d.albumPublic;
+      showAlbum();
+    } catch (e) { alertMsg('Could not change the album. Try again.'); disarmAlbum(); }
+  });
+
+  // ---------- add everything shown to the album (second click confirms) ----------
+  let bulkArm = null;
+  function disarmBulk(n) {
+    clearTimeout(bulkArm);
+    const b = $('bulk');
+    b.classList.remove('armed'); b.disabled = false;
+    b.textContent = 'Add all ' + (n === undefined ? '' : n + ' ') + 'shown to album';
+  }
+  $('bulk').addEventListener('click', async () => {
+    const b = $('bulk');
+    const ids = view.filter((it) => !it.approved && !it.hidden && !it.outtake && !it.private).map((it) => it.uploadId);
+    if (!ids.length) return;
+    if (!b.classList.contains('armed')) {
+      b.classList.add('armed'); b.textContent = 'Add ' + plural(ids.length, 'photo', 'photos') + '?';
+      bulkArm = setTimeout(() => disarmBulk(ids.length), 6000);
+      return;
+    }
+    clearTimeout(bulkArm);
+    b.disabled = true; b.textContent = 'Adding…';
+    try { await chunked('approve', ids, { approved: true }); }
+    catch (e) { alertMsg('Could not add them all. Refresh and try again.'); disarmBulk(); loadStatus().catch(() => {}); return; }
+    const set = new Set(ids);
+    for (const it of items) if (set.has(it.uploadId)) it.approved = true;
+    approvedCount += ids.length;
+    showAlbum();
+    // In "Not in the album yet", bring up the next batch; elsewhere show the new badges.
+    if ($('filter').value === 'unapproved') loadPage(true).catch(() => { render(); alertMsg('Added. Refresh to see the rest.'); });
+    else render();
+    loadStatus().catch(() => {});
+  });
+
+  // ---------- Photobooth: printer switch, printer + iPad status, recent prints ----------
+  const pretty = (n) => String(n || '').replace(/_/g, ' ').replace(/\bCanon /, '');
+  const ago = (iso) => { if (!iso) return 'never'; const s = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000)); return s < 60 ? s + 's ago' : s < 3600 ? Math.round(s / 60) + ' min ago' : Math.round(s / 3600) + ' h ago'; };
+  const fresh = (iso, sec) => iso && (Date.now() - Date.parse(iso)) / 1000 < sec;
+  let booth = null, boothBusy = false, boothTimer = null;
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+  function printerNames() {
+    const fromWorker = (booth && booth.worker && Array.isArray(booth.worker.printers)) ? booth.worker.printers.map((p) => p.name) : [];
+    const fromJobs = (booth ? booth.jobs : []).map((j) => j.printer).filter(Boolean);
+    return [...new Set([...fromWorker, ...fromJobs])].sort();
+  }
+  function renderBooth() {
+    if (!booth) return;
+    const st = booth.settings || {}, w = booth.worker || {}, b = booth.booth || {};
+    // summary line
+    const ipadOn = fresh(booth.boothSeenAt, 40);
+    $('ledBooth').className = 'led ' + (ipadOn ? (b.camera === 'ok' ? 'ok' : 'warn') : 'bad');
+    $('sumBooth').textContent = ipadOn ? ('iPad: ' + (b.camera === 'ok' ? 'camera ok' : (b.camera || 'camera?')) + (b.busy ? ' · guest in session' : ''))
+      : ('iPad: not seen ' + ago(booth.boothSeenAt));
+    const macOn = fresh(booth.workerSeenAt, 45);
+    const ps = Array.isArray(w.printers) ? w.printers : [];
+    const stopped = ps.filter((p) => p.state === 'stopped');
+    $('ledPrint').className = 'led ' + (!macOn ? 'bad' : (stopped.length || st.printMode === 'pause') ? 'warn' : 'ok');
+    $('sumPrint').textContent = !macOn ? ('Print Mac: not seen ' + ago(booth.workerSeenAt))
+      : st.printMode === 'pause' ? 'Printing paused'
+      : (st.printMode === 'only' ? 'Only ' + pretty(st.printOnly) : 'Alternating') + (stopped.length ? ' · ' + stopped.length + ' printer stopped' : '');
+    // switch
+    const names = printerNames();
+    const seg = $('printMode'); seg.textContent = '';
+    const add = (label, mode, only, cls) => {
+      const btn = el('button', cls || '', label); btn.type = 'button';
+      btn.classList.toggle('on', st.printMode === mode && (mode !== 'only' || st.printOnly === only));
+      btn.addEventListener('click', () => setBooth({ printMode: mode, printOnly: only }, mode === 'pause' ? 'Printing paused.' : mode === 'only' ? 'Only ' + pretty(only) + ' from the next print.' : 'Alternating from the next print.'));
+      seg.appendChild(btn);
+    };
+    add('Alternate', 'alternate', null);
+    names.forEach((n) => add('Only ' + pretty(n), 'only', n));
+    if (!names.length) { const x = el('button', '', 'Only one printer'); x.disabled = true; x.title = 'Printer names appear once the Mac reports in'; seg.appendChild(x); }
+    add('Pause', 'pause', null, 'pause');
+    $('modeNote').textContent = (st.updatedBy ? 'Last changed by ' + st.updatedBy + ' ' + ago(st.updatedAt) + '. ' : '') +
+      (st.printMode === 'pause' ? 'Prints wait in the queue until you pick Alternate or a printer.' : st.printMode === 'only' ? 'Sheets waiting in the other printer\'s queue are moved over.' : 'Each sheet goes to the less busy printer, taking turns. A stopped printer is skipped.');
+    // printers
+    const box = $('printers'); box.textContent = '';
+    if (!macOn) box.appendChild(el('div', 'printer', 'The print Mac hasn\'t reported in ' + (booth.workerSeenAt ? 'since ' + ago(booth.workerSeenAt) : 'yet') + '. Check that it\'s awake, on Bacco Secure, and that the print worker is running.'));
+    ps.forEach((p) => {
+      const c = el('div', 'printer');
+      const h = el('b'); const led = el('span', 'led ' + (p.state === 'stopped' ? 'bad' : p.state === 'unknown' ? 'warn' : 'ok'));
+      h.append(led, document.createTextNode(pretty(p.name)));
+      const label = { idle: 'Ready', printing: 'Printing', stopped: 'Stopped — check paper, ink or a jam', unknown: 'Status unknown' }[p.state] || p.state;
+      c.append(h, el('div', 'sub', label + (p.queued ? ' · ' + p.queued + ' waiting' : '') + (p.lastSentAt ? ' · last sheet ' + ago(p.lastSentAt) : '')));
+      if (p.state === 'stopped') {
+        const r = el('button', 'tbtn', 'Resume this printer'); r.type = 'button';
+        r.addEventListener('click', () => setBooth({ resumePrinters: [p.name] }, 'Resume sent. Fix the jam/paper first, or it will stop again.'));
+        c.appendChild(r);
+      }
+      box.appendChild(c);
+    });
+    if (w.lastError) box.appendChild(el('div', 'printer sub', 'Mac says: ' + w.lastError));
+    // jobs
+    const tb = $('jobs'); tb.textContent = '';
+    const jobs = (booth.jobs || []).slice(0, 15);
+    if (!jobs.length) { const tr = el('tr'); tr.appendChild(el('td', '', 'No prints yet.')); tb.appendChild(tr); }
+    jobs.forEach((j) => {
+      const tr = el('tr');
+      const st2 = el('td', 'st ' + j.status, { pending: 'Waiting', printing: 'Sending', done: 'Done', error: 'Error' }[j.status] || j.status);
+      const info = el('td'); info.append(document.createTextNode((j.printer ? pretty(j.printer) : '—') + (j.reprintOf ? ' · reprint' : '')));
+      if (j.error) info.appendChild(el('div', 'err', j.error));
+      const when = el('td', 'when', ago(j.createdAt));
+      const acts = el('td'); const wrap = el('div', 'acts');
+      if (j.url) { const a = el('a', '', 'View'); a.href = j.url; a.target = '_blank'; a.rel = 'noopener'; wrap.appendChild(a); }
+      (names.length ? names : [null]).forEach((n) => {
+        const r = el('button', '', n ? 'Reprint on ' + pretty(n) : 'Reprint'); r.type = 'button';
+        r.addEventListener('click', () => reprint(j.id, n, r));
+        wrap.appendChild(r);
+      });
+      acts.appendChild(wrap);
+      tr.append(st2, info, when, acts); tb.appendChild(tr);
+    });
+  }
+  async function loadBooth() {
+    try { booth = await api('booth_overview'); renderBooth(); } catch (e) { $('sumPrint').textContent = 'Printers: could not load'; }
+  }
+  async function setBooth(fields, okText) {
+    if (boothBusy) return; boothBusy = true;
+    try { await api('booth_set', fields); alertMsg(okText || 'Done.'); await loadBooth(); }
+    catch (e) { alertMsg('Could not change that: ' + e.message); }
+    finally { boothBusy = false; }
+  }
+  async function reprint(jobId, printer, btn) {
+    btn.disabled = true; const t = btn.textContent; btn.textContent = 'Sending…';
+    try { await api('booth_reprint', { jobId, printer }); alertMsg('Reprint queued' + (printer ? ' on ' + pretty(printer) : '') + '.'); await loadBooth(); }
+    catch (e) { alertMsg('Could not reprint: ' + e.message); btn.disabled = false; btn.textContent = t; }
+  }
+  $('camReset').addEventListener('click', () => setBooth({ resetCamera: true }, 'Camera reset sent — the iPad restarts its camera within ~15 s (after any guest finishes).'));
+  $('boothReload').addEventListener('click', () => setBooth({ reloadBooth: true }, 'Reload sent — the booth page reloads within ~15 s (after any guest finishes).'));
+  $('booth').addEventListener('toggle', () => { $('boothChev').textContent = $('booth').open ? 'Hide' : 'Show'; if ($('booth').open) loadBooth(); });
+  // Keep the panel current while this page is open and visible.
+  boothTimer = setInterval(() => { if (document.visibilityState === 'visible') loadBooth(); }, 10000);
+  loadBooth();
+
+  function alertMsg(t) { const n = document.createElement('p'); n.className = 'note'; n.textContent = t; $('stats').after(n); setTimeout(() => n.remove(), 4000); }
+  let toastEl = null, toastTimer = null;
+  function toast(text, onUndo) {
+    if (toastEl) toastEl.remove();
+    clearTimeout(toastTimer);
+    const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status');
+    const s = document.createElement('span'); s.textContent = text; t.appendChild(s);
+    if (onUndo) {
+      const u = document.createElement('button'); u.type = 'button'; u.textContent = 'Undo';
+      u.addEventListener('click', () => { t.remove(); onUndo(); }); t.appendChild(u);
+    }
+    // Inside the open viewer the toast must live in the dialog, or the modal hides it.
+    ($('lb').open ? $('lb') : document.body).appendChild(t);
+    toastEl = t; toastTimer = setTimeout(() => t.remove(), onUndo ? 8000 : 3500);
+  }
+
+  $('who').addEventListener('change', () => { selected.clear(); lastPick = -1; render(); });
+  $('filter').addEventListener('change', () => loadPage(true).catch(() => alertMsg('Could not load those photos.')));
+  $('more').addEventListener('click', () => loadPage(false).catch(() => alertMsg('Could not load more.')));
+  $('refresh').addEventListener('click', () => Promise.all([loadStatus(), loadPage(true)]).catch(() => alertMsg('Could not refresh.')));
+  if (/^#?deleted$/.test(location.hash) || query.get('view') === 'deleted') $('filter').value = 'deleted';
+
+  Promise.all([loadStatus(), loadPage(true)]).catch((e) => {
+    const badKey = /owner token|invalid link/i.test(String(e.message));
+    if (badKey) store.clear(); // a wrong key must not stick to this device
+    $('app').textContent = '';
+    const p = document.createElement('p'); p.className = 'msg';
+    p.textContent = badKey ? 'That admin link is not valid (or was turned off). Open the admin link from the email Pete sent you.' : 'Could not load the photos. Check your connection and refresh.';
+    $('app').appendChild(p);
+  });
+})();
+</script>
+</body>
+</html>

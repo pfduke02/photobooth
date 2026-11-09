@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Share your photos &amp; videos — Lisa &amp; Pete</title>
+<meta name="description" content="Share your favorite photos and videos from Lisa &amp; Pete's wedding.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#f6f3ea">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://hseupjbneifqxaykxltt.supabase.co" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&amp;family=Archivo:wght@400;500;600&amp;family=Pinyon+Script&amp;display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #f6f3ea; --paper: #fbf9f3; --ink: #1d2433; --muted: rgba(29,36,51,0.72);
+    --terracotta: #b05f36; --forest: #26493a; --forest-dark: #1c372b; --line: rgba(29,36,51,0.14);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; padding: 0; background: var(--cream); color: var(--ink); font-family: 'Archivo', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: var(--forest); }
+  a:hover { color: var(--terracotta); }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  header { border-bottom: 1px solid var(--line); }
+  .bar { max-width: 1160px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+  .logo { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 600; letter-spacing: 0.04em; color: var(--ink); text-decoration: none; }
+  .logo span { color: var(--terracotta); font-style: italic; }
+  .bar a.album { font-size: 14px; font-weight: 500; }
+
+  main { max-width: 640px; margin: 0 auto; padding: 48px 20px 80px; padding-bottom: max(80px, env(safe-area-inset-bottom)); animation: fadeUp 0.4s ease; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  .hero { text-align: center; }
+  .eyebrow { font-family: 'Cormorant Garamond', serif; font-size: 13px; font-weight: 600; letter-spacing: 0.32em; text-transform: uppercase; color: var(--terracotta); }
+  .names { margin: 10px 0 6px; font-family: 'Pinyon Script', 'Cormorant Garamond', serif; font-weight: 400; font-size: clamp(48px, 13vw, 68px); line-height: 1.1; color: var(--ink); }
+  .rule { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 2px 0 12px; }
+  .rule span { width: 56px; height: 1px; background: rgba(29,36,51,0.35); }
+  .rule i { width: 4px; height: 4px; border-radius: 50%; background: rgba(29,36,51,0.55); }
+  .date { margin: 0; font-family: 'Cormorant Garamond', serif; font-size: 14px; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); }
+  .lead { margin: 22px auto 6px; max-width: 460px; font-family: 'Cormorant Garamond', serif; font-size: 25px; line-height: 1.3; font-weight: 500; text-wrap: balance; }
+  .proof { margin: 0; font-size: 14px; color: var(--muted); min-height: 20px; }
+
+  .panel { margin: 28px 0 0; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 22px; }
+  .field { display: block; }
+  .label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 8px; }
+  .label em { font-style: normal; font-weight: 400; color: var(--muted); }
+  input[type=text], input[type=url] { width: 100%; font: 400 17px 'Archivo', system-ui, sans-serif; color: var(--ink); background: #fff; border: 1px solid rgba(29,36,51,0.25); border-radius: 6px; padding: 13px 14px; }
+  input[type=text]:focus, input[type=url]:focus { outline: 3px solid rgba(38,73,58,0.25); border-color: var(--forest); }
+  input::placeholder { color: rgba(29,36,51,0.36); opacity: 1; }
+  .hint { display: block; margin-top: 7px; font-size: 13px; color: var(--muted); }
+  .who { margin-top: 18px; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .seg button { font: 500 14px/1.3 'Archivo', system-ui, sans-serif; text-align: left; min-height: 56px; padding: 10px 12px; border-radius: 6px; border: 1px solid rgba(29,36,51,0.25); background: #fff; color: var(--ink); cursor: pointer; }
+  .seg button b { display: block; font-weight: 600; font-size: 15px; margin-bottom: 2px; }
+  .seg button small { color: var(--muted); font-size: 12px; }
+  .seg button.on { border-color: var(--forest); box-shadow: inset 0 0 0 1px var(--forest); background: #f1f6f3; }
+  .seg button.on b::before { content: '✓ '; color: var(--forest); }
+  .btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; margin-top: 16px; min-height: 56px; border: 0; border-radius: 6px; background: var(--forest); color: var(--cream); font: 600 18px 'Archivo', system-ui, sans-serif; letter-spacing: 0.01em; cursor: pointer; }
+  .btn:hover { background: var(--forest-dark); }
+  .btn:active { transform: translateY(1px); }
+  .btn:focus-visible { outline: 3px solid rgba(176,95,54,0.45); outline-offset: 2px; }
+  .btn svg { width: 22px; height: 22px; }
+  .fine { margin: 12px 0 0; text-align: center; font-size: 13px; color: var(--muted); }
+  .linkbtn { display: block; margin: 12px auto 0; padding: 6px 4px; border: 0; background: none; color: var(--forest); font: 500 14px 'Archivo', system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .linkbtn:hover { color: var(--terracotta); }
+  .linkbox { margin-top: 12px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .linkbox p { margin: 0 0 12px; font-size: 15px; line-height: 1.45; }
+  .linkbox input { margin-top: 8px; }
+  .btn-quiet { min-height: 48px; margin-top: 10px; background: transparent; color: var(--forest); border: 1px solid var(--forest); font-size: 16px; }
+  .btn-quiet:hover { background: rgba(38,73,58,0.06); }
+  .btn-quiet:disabled { opacity: 0.6; }
+
+  .resume { margin: 20px 0 0; padding: 16px 18px; border: 1px solid rgba(176,95,54,0.4); background: #fdf5f0; border-radius: 8px; }
+  .resume p { margin: 0 0 10px; font-size: 15px; line-height: 1.45; }
+  .resume p.names { font-size: 13px; color: var(--muted); font-family: 'Archivo', system-ui, sans-serif; line-height: 1.4; margin-bottom: 10px; word-break: break-word; }
+  .resume .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .resume .row .btn { width: auto; margin: 0; min-height: 44px; padding: 0 16px; font-size: 15px; }
+  .resume .row .btn-quiet { min-height: 44px; }
+
+  .tray, .mine { margin-top: 32px; }
+  .tray-status { margin: 0 0 12px; font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 500; text-align: center; }
+  .mine-title { margin: 0 0 12px; text-align: center; font-family: 'Cormorant Garamond', serif; font-size: 13px; font-weight: 600; letter-spacing: 0.28em; text-transform: uppercase; color: var(--terracotta); }
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  @media (min-width: 560px) { .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+  .tile { position: relative; margin: 0; aspect-ratio: 1 / 1; border-radius: 6px; overflow: hidden; background: #e9e3d3; }
+  .tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .tile .ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 8px; text-align: center; font-size: 11px; color: var(--muted); word-break: break-all; }
+  .tile .meter { position: absolute; left: 8px; right: 8px; bottom: 8px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.65); overflow: hidden; display: none; }
+  .tile .meter span { display: block; height: 100%; width: 0; background: var(--forest); transition: width 0.2s ease; }
+  .tile[data-state=uploading] .meter, .tile[data-state=queued] .meter { display: block; }
+  .tile[data-state=queued] img, .tile[data-state=uploading] img, .tile[data-state=verifying] img { opacity: 0.7; }
+  .tile .state { position: absolute; left: 6px; bottom: 6px; display: none; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: rgba(251,249,243,0.94); color: var(--ink); }
+  .tile .state svg { width: 14px; height: 14px; }
+  .tile[data-state=verifying] .state, .tile[data-state=done] .state, .tile[data-state=dup] .state, .tile[data-state=removed] .state { display: inline-flex; }
+  .tile[data-state=done] .state, .tile[data-state=dup] .state { color: var(--forest); }
+  .tile[data-state=dup] img, .tile[data-state=removed] img { opacity: 0.5; }
+  .tile[data-state=removed] .state { color: var(--muted); }
+  .tile .pct { position: absolute; left: 6px; bottom: 16px; display: none; padding: 3px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(251,249,243,0.94); color: var(--ink); }
+  .tile[data-state=uploading].video .pct { display: block; }
+  .tile .badges { position: absolute; top: 6px; left: 6px; display: flex; gap: 4px; }
+  .tile .badges span { padding: 3px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(29,36,51,0.72); color: #fff; }
+  .tile .rm { position: absolute; top: 6px; right: 6px; min-width: 32px; height: 32px; padding: 0; border: 0; border-radius: 999px; background: rgba(251,249,243,0.94); color: var(--ink); font: 600 18px/1 'Archivo', system-ui, sans-serif; cursor: pointer; }
+  .tile.confirm .rm { padding: 0 12px; background: var(--terracotta); color: #fff; font-size: 13px; }
+  .tile .rm:disabled { opacity: 0.7; }
+  .tile .retry { position: absolute; inset: auto 6px 6px 6px; display: none; min-height: 34px; border: 0; border-radius: 6px; background: var(--terracotta); color: #fff; font: 600 13px 'Archivo', system-ui, sans-serif; cursor: pointer; }
+  .tile[data-state=failed] .retry { display: block; }
+  .tile .retry[hidden] { display: none !important; }
+  .tile[data-state=failed] img { opacity: 0.45; }
+  .tile .why { position: absolute; top: 6px; left: 6px; right: 6px; display: none; padding: 3px 6px; border-radius: 4px; font-size: 11px; background: rgba(251,249,243,0.94); color: var(--terracotta); }
+  .tile[data-state=failed] .why { display: block; }
+  .tile[data-state=failed] .badges { display: none; }
+  .spin { width: 12px; height: 12px; border: 2px solid rgba(29,36,51,0.25); border-top-color: var(--ink); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .privacy { margin: 40px 0 0; text-align: center; font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 19px; color: rgba(29,36,51,0.62); }
+  .closed { text-align: center; font-family: 'Cormorant Garamond', serif; font-size: 22px; }
+
+  @media (prefers-reduced-motion: reduce) { main { animation: none; } .spin { animation-duration: 2s; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="/" aria-label="Lisa &amp; Pete — wedding home">L <span>&amp;</span> P</a>
+    <a class="album" id="albumLink" href="/photos/album/">See the album</a>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="eyebrow">Share your photos &amp; videos</div>
+    <h1 class="names">Lisa &amp; Pete</h1>
+    <div class="rule" aria-hidden="true"><span></span><i></i><span></span></div>
+    <p class="date">November 7, 2026 · Il Bacco</p>
+    <p class="lead">We'd love your favorite photos and videos from the wedding.</p>
+    <p class="proof" id="proof" aria-live="polite"></p>
+  </section>
+
+  <section class="resume" id="resume" hidden aria-live="polite">
+    <p id="resumeText"></p>
+    <p class="names" id="resumeNames" hidden></p>
+    <div class="row">
+      <button class="btn" id="resumeSend" type="button" hidden>Send them now</button>
+      <button class="btn" id="resumePick" type="button" hidden>Choose them again</button>
+      <button class="btn btn-quiet" id="resumeSkip" type="button">Not now</button>
+    </div>
+  </section>
+
+  <section class="panel" id="panel" aria-label="Choose photos and videos to share">
+    <label class="field" for="name">
+      <span class="label">Add your name <em>so we know who to thank</em></span>
+      <input id="name" type="text" autocomplete="name" maxlength="60" placeholder="Anonymous" aria-describedby="nameHint">
+      <span class="hint" id="nameHint">Leave it blank to share as Anonymous.</span>
+    </label>
+    <div class="who">
+      <span class="label" id="whoLabel">Who can see these?</span>
+      <div class="seg" role="radiogroup" aria-labelledby="whoLabel">
+        <button type="button" id="whoAlbum" role="radio" aria-checked="true" class="on"><b>Everyone</b><small>Lisa &amp; Pete choose what goes in the shared album.</small></button>
+        <button type="button" id="whoFamily" role="radio" aria-checked="false"><b>Just the family</b><small>Only Lisa, Pete and their parents. Never in the album.</small></button>
+      </div>
+    </div>
+    <button id="pick" class="btn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="2"></rect><circle cx="9" cy="11" r="2"></circle><path d="M21 17l-5-5-9 8"></path></svg>
+      Choose photos &amp; videos
+    </button>
+    <input id="file" type="file" accept="image/*,video/*" multiple hidden>
+    <p class="fine" id="fine">Pick as many as you like · videos up to 2 GB · no app, no sign-in</p>
+    <button id="linkToggle" class="linkbtn" type="button" aria-expanded="false" aria-controls="linkBox">Video too big? Share a link instead</button>
+    <div id="linkBox" class="linkbox" hidden>
+      <p id="linkMsg">For a video over 2 GB: upload it to iCloud, Google Drive or Dropbox, turn on link sharing, and paste the link here. Lisa &amp; Pete will pick it up from there.</p>
+      <label class="visually-hidden" for="linkUrl">Share link</label>
+      <input id="linkUrl" type="url" inputmode="url" autocomplete="off" maxlength="600" placeholder="https://…">
+      <label class="visually-hidden" for="linkContact">Email or phone, in case the link doesn't open</label>
+      <input id="linkContact" type="text" inputmode="email" autocomplete="email" maxlength="120" placeholder="Your email or phone (optional)">
+      <button id="linkSend" class="btn btn-quiet" type="button">Send the link</button>
+      <p id="linkStatus" class="fine" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section id="tray" class="tray" hidden>
+    <p id="trayStatus" class="tray-status" aria-live="polite"></p>
+    <div id="trayGrid" class="grid"></div>
+    <p id="keepOpen" class="fine">Keep this page open until everything says Received.</p>
+  </section>
+
+  <section id="mine" class="mine" hidden>
+    <h2 id="mineTitle" class="mine-title">What you've shared</h2>
+    <div id="mineGrid" class="grid"></div>
+  </section>
+
+  <p class="privacy">Everything goes straight to Lisa &amp; Pete. Only what they add to the album is shared.</p>
+</main>
+
+<script src="/photos/tus.min.js" defer></script>
+<script>
+(() => {
+  'use strict';
+  const API = 'https://hseupjbneifqxaykxltt.supabase.co/functions/v1/api';
+  const DEFAULT_EVENT = 'bf4d479a7b1c16d5b088ede0';
+  const PHOTO_LANES = 2, VIDEO_LANES = 1;      // photos two at a time; one video at a time
+  const FULL_HASH_MAX = 64 * 1048576;          // bigger files are fingerprinted (head + tail + size)
+  const KEEP_MAX = 512 * 1048576;              // files up to this size are kept on the phone until Received
+  const qs = new URLSearchParams(location.search);
+  const EVENT = /^[a-f0-9]{16,64}$/.test(qs.get('e') || '') ? qs.get('e') : DEFAULT_EVENT;
+  const $ = (id) => document.getElementById(id);
+  if (EVENT !== DEFAULT_EVENT) $('albumLink').href = '/photos/album/?e=' + EVENT;
+
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private mode: fine */ } },
+  };
+  const rid = (n) => {
+    const a = new Uint8Array(n); crypto.getRandomValues(a);
+    let s = ''; for (const b of a) s += String.fromCharCode(b);
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
+
+  const DKEY = 'lp-photos-device-' + EVENT.slice(0, 8);
+  let deviceKey = store.get(DKEY);
+  if (!deviceKey || !/^[A-Za-z0-9_-]{16,64}$/.test(deviceKey)) { deviceKey = rid(18); store.set(DKEY, deviceKey); }
+
+  const nameEl = $('name');
+  const NAME_KEY = 'lp-photos-guest-name';
+  nameEl.value = store.get(NAME_KEY) || '';
+  const syncHint = () => {
+    $('nameHint').textContent = nameEl.value.trim()
+      ? 'Lisa & Pete will see your name with what you share.'
+      : 'Leave it blank to share as Anonymous.';
+  };
+  syncHint();
+  nameEl.addEventListener('input', () => { store.set(NAME_KEY, nameEl.value.trim()); syncHint(); });
+
+  // ---------- who can see these: the album, or just the family ----------
+  const PRIV_KEY = 'lp-photos-private-' + EVENT.slice(0, 8);
+  let privateMode = store.get(PRIV_KEY) === '1';
+  function showWho() {
+    $('whoAlbum').classList.toggle('on', !privateMode); $('whoAlbum').setAttribute('aria-checked', String(!privateMode));
+    $('whoFamily').classList.toggle('on', privateMode); $('whoFamily').setAttribute('aria-checked', String(privateMode));
+    $('pick').lastChild.textContent = privateMode ? ' Choose photos & videos for the family' : ' Choose photos & videos';
+  }
+  $('whoAlbum').addEventListener('click', () => { privateMode = false; store.set(PRIV_KEY, '0'); showWho(); });
+  $('whoFamily').addEventListener('click', () => { privateMode = true; store.set(PRIV_KEY, '1'); showWho(); });
+  showWho();
+
+  let maxFileBytes = 50 * 1024 * 1024;
+  let maxVideoBytes = 2 * 1024 * 1024 * 1024;
+  let maxBatch = 5;
+  let uploadKey = null;   // public key for the resumable video endpoint (from hello / intent)
+  let received = 0, videosShared = 0, contributors = 0;
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // Every call is safe to repeat, so a busy server (5xx/429) or a dropped connection is
+  // retried a few times with backoff before the caller sees an error.
+  async function api(action, extra, opts) {
+    const tries = (opts && opts.tries) || 5;
+    const okStatus = (opts && opts.okStatus) || [];
+    let last = null;
+    for (let a = 0; a < tries; a++) {
+      if (a) await sleep(Math.min(6000, 600 * Math.pow(2, a - 1)) + Math.random() * 400);
+      let res;
+      try {
+        res = await fetch(API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.assign({ e: EVENT, action, deviceKey }, extra || {})),
+        });
+      } catch (e) { last = new Error('network'); continue; }
+      let data = null;
+      try { data = await res.json(); } catch (e) { /* not json */ }
+      if (res.ok && data && data.ok) return data;
+      if (okStatus.indexOf(res.status) >= 0) return data || { ok: true };
+      const err = new Error((data && data.error) || ('HTTP ' + res.status));
+      err.status = res.status;
+      if (res.status >= 500 || res.status === 429) { last = err; continue; }
+      throw err;
+    }
+    throw last || new Error('network');
+  }
+
+  const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+  const mb = (n) => n >= 1073741824 ? (n / 1073741824).toFixed(1) + ' GB' : Math.max(1, Math.round(n / 1048576)) + ' MB';
+  const dur = (s) => { s = Math.round(Number(s) || 0); if (!s) return ''; const m = Math.floor(s / 60); return m + ':' + String(s % 60).padStart(2, '0'); };
+  const isVideoFile = (f) => /^video\//.test(f.type || '') || /\.(mp4|m4v|mov|qt|webm|3gp|3g2|mkv|avi|hevc|mts|m2ts)$/i.test(f.name || '');
+  const isPhotoFile = (f) => /^image\//.test(f.type || '') || /\.(jpe?g|png|heic|heif|webp|gif|avif)$/i.test(f.name || '');
+
+  // ---------- intro: counts ----------
+  function showProof() {
+    const p = $('proof');
+    if (!received) { p.textContent = 'Be the first to share a photo or video.'; return; }
+    const photos = Math.max(0, received - videosShared);
+    const what = [photos ? plural(photos, 'photo', 'photos') : '', videosShared ? plural(videosShared, 'video', 'videos') : ''].filter(Boolean).join(' and ');
+    p.textContent = what + ' shared so far' + (contributors ? ' by ' + plural(contributors, 'guest', 'guests') : '');
+  }
+  function closed() {
+    const panel = $('panel');
+    panel.textContent = '';
+    const msg = document.createElement('p');
+    msg.className = 'closed';
+    msg.textContent = 'Sharing has closed. Thank you for everything you sent!';
+    panel.appendChild(msg);
+  }
+  let helloFailed = false;
+  async function hello() {
+    try {
+      const h = await api('hello');
+      if (h.maxFileBytes) maxFileBytes = h.maxFileBytes;
+      if (h.maxVideoBytes) maxVideoBytes = h.maxVideoBytes;
+      if (h.maxBatch) maxBatch = Math.max(1, Math.min(10, h.maxBatch));
+      if (h.uploadKey) uploadKey = h.uploadKey;
+      helloFailed = false;
+      received = h.received || 0; videosShared = h.videos || 0; contributors = h.contributors || 0;
+      $('fine').textContent = 'Pick as many as you like · videos up to ' + mb(maxVideoBytes) + ' · no app, no sign-in';
+      $('linkMsg').textContent = 'For a video over ' + mb(maxVideoBytes) + ': upload it to iCloud, Google Drive or Dropbox, turn on link sharing, and paste the link here. Lisa & Pete will pick it up from there.';
+      showProof();
+      if (!h.windowOpen) closed();
+    } catch (e) {
+      helloFailed = true;
+      $('proof').textContent = 'Having trouble connecting — check your Wi-Fi. You can still choose photos; they’ll send when the connection is back.';
+    }
+  }
+
+  // ---------- what you've shared (server-verified, survives reloads) ----------
+  const mine = new Map();   // uploadId -> { thumb, name, at, kind, duration, private }
+  function badges(it) {
+    const b = document.createElement('div'); b.className = 'badges';
+    if (it.kind === 'video') { const s = document.createElement('span'); s.textContent = '▶ ' + (dur(it.duration) || 'video'); b.appendChild(s); }
+    if (it.private) { const s = document.createElement('span'); s.textContent = '🔒 family'; b.appendChild(s); }
+    return b;
+  }
+  function renderMine() {
+    const grid = $('mineGrid');
+    const list = Array.from(mine.entries()).sort((a, b) => String(b[1].at).localeCompare(String(a[1].at)));
+    $('mine').hidden = list.length === 0;
+    const nv = list.filter(([, it]) => it.kind === 'video').length, np = list.length - nv;
+    const what = [np ? plural(np, 'photo', 'photos') : '', nv ? plural(nv, 'video', 'videos') : ''].filter(Boolean).join(' and ');
+    $('mineTitle').textContent = "You've shared " + what;
+    grid.textContent = '';
+    for (const [id, it] of list) {
+      const fig = document.createElement('figure');
+      fig.className = 'tile' + (it.kind === 'video' ? ' video' : '');
+      fig.dataset.state = 'done';
+      if (it.thumb) {
+        const img = document.createElement('img');
+        img.src = it.thumb; img.alt = ''; img.loading = 'lazy'; img.decoding = 'async';
+        fig.appendChild(img);
+      } else {
+        const ph = document.createElement('div'); ph.className = 'ph'; ph.textContent = it.kind === 'video' ? '▶ ' + (it.name || 'Video') : (it.name || 'Photo');
+        fig.appendChild(ph);
+      }
+      fig.appendChild(badges(it));
+      // take it back: first tap arms, second tap removes it for good
+      const rm = document.createElement('button');
+      rm.type = 'button'; rm.className = 'rm'; rm.textContent = '×';
+      rm.setAttribute('aria-label', 'Remove this ' + (it.kind === 'video' ? 'video' : 'photo'));
+      let armed = null;
+      rm.addEventListener('click', async () => {
+        if (!fig.classList.contains('confirm')) {
+          fig.classList.add('confirm'); rm.textContent = 'Remove';
+          armed = setTimeout(() => { fig.classList.remove('confirm'); rm.textContent = '×'; }, 4000);
+          return;
+        }
+        clearTimeout(armed);
+        rm.disabled = true; rm.textContent = 'Removing…';
+        try {
+          await api('remove', { uploadId: id }, { okStatus: [404] });
+          mine.delete(id);
+          received = Math.max(0, received - 1); if (it.kind === 'video') videosShared = Math.max(0, videosShared - 1);
+          showProof();
+          const t = items.find((i) => i.id === id);
+          if (t) setState(t, 'removed');
+          renderMine();
+        } catch (e) { rm.disabled = false; rm.textContent = 'Try again'; }
+      });
+      fig.appendChild(rm);
+      grid.appendChild(fig);
+    }
+  }
+  let unfinished = [];   // from the server: files this phone started and never finished
+  async function loadMine() {
+    try {
+      const m = await api('mine');
+      for (const it of m.items || []) {
+        const prev = mine.get(it.uploadId);
+        mine.set(it.uploadId, { thumb: (prev && prev.thumb) || it.thumbUrl, name: it.name, at: it.at, kind: it.kind || 'photo', duration: it.duration, private: !!it.private });
+      }
+      unfinished = m.unfinished || [];
+      renderMine();
+      // anything the server already has can leave the phone's queue
+      for (const r of stored) if (mine.has(r.id)) queue.del(r.id);
+      stored = stored.filter((r) => !mine.has(r.id));
+      renderResume();
+    } catch (e) { /* the list is a convenience; uploads still work */ }
+  }
+
+  // ---------- the phone keeps the picked files until they are Received ----------
+  // (IndexedDB holds File objects, so after a closed tab or a crash the page can send them again
+  // without asking the guest to find them. Photos and videos up to KEEP_MAX.)
+  const queue = (() => {
+    let dbp = null;
+    const open = () => dbp || (dbp = new Promise((res, rej) => {
+      try {
+        const r = indexedDB.open('lp-photos-queue-' + EVENT.slice(0, 8), 1);
+        r.onupgradeneeded = () => { r.result.createObjectStore('queue', { keyPath: 'id' }); };
+        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(new Error('blocked'));
+      } catch (e) { rej(e); }
+    }));
+    const run = async (mode, fn) => {
+      const db = await open();
+      return new Promise((res, rej) => {
+        const t = db.transaction('queue', mode); const req = fn(t.objectStore('queue'));
+        t.oncomplete = () => res(req && req.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+      });
+    };
+    return {
+      put: (rec) => run('readwrite', (s) => s.put(rec)).catch(() => {}),
+      del: (id) => run('readwrite', (s) => s.delete(id)).catch(() => {}),
+      all: () => run('readonly', (s) => s.getAll()).then((r) => Array.isArray(r) ? r : []).catch(() => []),
+    };
+  })();
+  let stored = [];
+  const SKIP_KEY = 'lp-photos-skip-' + EVENT.slice(0, 8);
+  // "Not now" quiets the reminder for a day; the files stay on the phone.
+  function skipped() { try { const m = JSON.parse(store.get(SKIP_KEY) || '{}'); const now = Date.now(); return new Set(Object.keys(m).filter((k) => now - m[k] < 86400000)); } catch (e) { return new Set(); } }
+  function renderResume() {
+    const inTray = new Set(items.map((i) => i.id));
+    const skip = skipped();
+    const st = stored.filter((r) => !inTray.has(r.id) && !skip.has(r.id) && r.file);
+    const stIds = new Set(st.map((r) => r.id));
+    const un = unfinished.filter((u) => !inTray.has(u.uploadId) && !stIds.has(u.uploadId) && !skip.has(u.uploadId) && !mine.has(u.uploadId));
+    const box = $('resume');
+    if (!st.length && !un.length) { box.hidden = true; return; }
+    const n = st.length + un.length;
+    $('resumeText').textContent = (n === 1 ? 'One of your files didn’t finish sending last time.' : n + ' of your files didn’t finish sending last time.') +
+      (st.length ? ' They’re still on this phone — one tap sends them.' : ' Choose them again and they’ll pick up where they left off.');
+    $('resumeNames').hidden = !un.length;
+    $('resumeNames').textContent = un.length ? 'Still missing: ' + un.map((u) => u.name).join(', ') : '';
+    $('resumeSend').hidden = !st.length;
+    $('resumeSend').textContent = st.length === 1 ? 'Send it now' : 'Send all ' + st.length + ' now';
+    $('resumePick').hidden = !un.length;
+    box.hidden = false;
+  }
+  $('resumeSend').addEventListener('click', () => {
+    const skip = skipped();
+    const st = stored.filter((r) => !items.some((i) => i.id === r.id) && !skip.has(r.id) && r.file);
+    const meta = new Map(); st.forEach((r) => meta.set(r.file, { id: r.id, private: !!r.private }));
+    addFiles(st.map((r) => r.file), meta);
+    renderResume();
+  });
+  $('resumePick').addEventListener('click', () => { pickingUnfinished = true; $('file').click(); });
+  $('resumeSkip').addEventListener('click', () => {
+    let m = {}; try { m = JSON.parse(store.get(SKIP_KEY) || '{}'); } catch (e) { m = {}; }
+    const now = Date.now();
+    for (const r of stored) m[r.id] = now;
+    for (const u of unfinished) m[u.uploadId] = now;
+    store.set(SKIP_KEY, JSON.stringify(m));
+    renderResume();
+  });
+  let pickingUnfinished = false;
+
+  // ---------- thumbnails and posters, made on the phone ----------
+  async function makeThumb(file, max) {
+    max = max || 480;
+    try {
+      let src = null, w = 0, h = 0, bmp = null, url = null;
+      if (window.createImageBitmap) {
+        try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (e) { bmp = null; }
+      }
+      if (bmp) { src = bmp; w = bmp.width; h = bmp.height; }
+      else {
+        url = URL.createObjectURL(file);
+        const img = await new Promise((resolve, reject) => {
+          const i = new Image(); i.onload = () => resolve(i); i.onerror = reject; i.src = url;
+        });
+        src = img; w = img.naturalWidth; h = img.naturalHeight;
+      }
+      if (!w || !h) return null;
+      const s = Math.min(1, max / Math.max(w, h));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
+      c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+      if (bmp && bmp.close) bmp.close();
+      if (url) URL.revokeObjectURL(url);
+      const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.8));
+      return blob ? { blob, url: URL.createObjectURL(blob) } : null;
+    } catch (e) { return null; }
+  }
+  // A frame from about a second in, plus the length. Never throws; a video the phone can't decode
+  // just has no poster.
+  function makePoster(file) {
+    return new Promise((resolve) => {
+      let settled = false, url = null;
+      const v = document.createElement('video');
+      const finish = (res) => {
+        if (settled) return; settled = true; clearTimeout(timer);
+        try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) { /* fine */ }
+        if (url) URL.revokeObjectURL(url);
+        resolve(res);
+      };
+      const timer = setTimeout(() => finish({ blob: null, url: null, duration: isFinite(v.duration) ? v.duration : null }), 12000);
+      try {
+        url = URL.createObjectURL(file);
+        v.muted = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'metadata';
+        v.onerror = () => finish({ blob: null, url: null, duration: null });
+        v.onloadedmetadata = () => {
+          const t = Math.min(1, (v.duration || 0) / 2);
+          try { v.currentTime = t; } catch (e) { finish({ blob: null, url: null, duration: v.duration }); }
+        };
+        v.onseeked = async () => {
+          try {
+            const w = v.videoWidth, h = v.videoHeight;
+            if (!w || !h) return finish({ blob: null, url: null, duration: v.duration });
+            const s = Math.min(1, 480 / Math.max(w, h));
+            const c = document.createElement('canvas'); c.width = Math.round(w * s); c.height = Math.round(h * s);
+            c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+            const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.8));
+            finish({ blob, url: blob ? URL.createObjectURL(blob) : null, duration: v.duration });
+          } catch (e) { finish({ blob: null, url: null, duration: v.duration }); }
+        };
+        v.src = url;
+      } catch (e) { finish({ blob: null, url: null, duration: null }); }
+    });
+  }
+
+  // ---------- fingerprint, so a file already in the album isn't sent twice ----------
+  // Whole-file SHA-256 up to FULL_HASH_MAX; beyond that, the first and last 4 MB plus the size.
+  async function fingerprint(file) {
+    try {
+      if (!(window.crypto && crypto.subtle)) return null;
+      let buf;
+      if (file.size <= FULL_HASH_MAX) buf = await file.arrayBuffer();
+      else {
+        const head = new Uint8Array(await file.slice(0, 4194304).arrayBuffer());
+        const tail = new Uint8Array(await file.slice(file.size - 4194304).arrayBuffer());
+        const sz = new TextEncoder().encode(String(file.size));
+        buf = new Uint8Array(head.length + tail.length + sz.length);
+        buf.set(head, 0); buf.set(tail, head.length); buf.set(sz, head.length + tail.length);
+      }
+      const h = await crypto.subtle.digest('SHA-256', buf);
+      return Array.from(new Uint8Array(h), (b) => b.toString(16).padStart(2, '0')).join('');
+    } catch (e) { return null; }
+  }
+
+  // ---------- the tray ----------
+  const items = [];
+  const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>';
+  const busy = (i) => i.state === 'queued' || i.state === 'uploading' || i.state === 'verifying';
+
+  function makeTile(it) {
+    const fig = document.createElement('figure');
+    fig.className = 'tile' + (it.kind === 'video' ? ' video' : '');
+    fig.setAttribute('aria-label', it.name);
+    const ph = document.createElement('div'); ph.className = 'ph';
+    const meter = document.createElement('div'); meter.className = 'meter'; meter.appendChild(document.createElement('span'));
+    const pct = document.createElement('div'); pct.className = 'pct';
+    const state = document.createElement('div'); state.className = 'state';
+    const why = document.createElement('div'); why.className = 'why';
+    const bd = badges(it);
+    const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'retry'; retry.textContent = 'Retry';
+    retry.addEventListener('click', () => { if (it.fatal) return; clearTimeout(it.timer); it.timer = null; it.tries = 0; it.auto = 0; setState(it, 'queued'); uploadLoop(); });
+    fig.append(ph, meter, pct, state, why, bd, retry);
+    it.parts = { fig, ph, meter: meter.firstChild, pct, state, why, badges: bd, retry };
+    return fig;
+  }
+  function setImage(it) {
+    if (!it.thumbUrl) { it.parts.ph.textContent = (it.kind === 'video' ? '▶ ' : '') + it.name; return; }
+    const img = document.createElement('img'); img.src = it.thumbUrl; img.alt = '';
+    it.parts.fig.insertBefore(img, it.parts.ph);
+  }
+  function refreshBadges(it) { const b = badges(it); it.parts.fig.replaceChild(b, it.parts.badges); it.parts.badges = b; }
+  function setState(it, state, progress) {
+    it.state = state;
+    const p = it.parts;
+    p.fig.dataset.state = state;
+    if (state !== 'failed') p.why.textContent = '';
+    if (state === 'queued') { p.meter.style.width = '2%'; p.pct.textContent = ''; }
+    if (state === 'uploading') {
+      const pc = Math.max(2, Math.round((progress || 0) * 100));
+      p.meter.style.width = pc + '%';
+      if (it.kind === 'video') p.pct.textContent = pc + '% of ' + mb(it.size);
+    }
+    if (state === 'verifying') { p.state.innerHTML = '<span class="spin" aria-hidden="true"></span>'; p.state.append('Checking'); p.pct.textContent = ''; }
+    if (state === 'done') { p.state.innerHTML = CHECK; p.state.append('Received'); }
+    if (state === 'dup') { p.state.innerHTML = CHECK; p.state.append('Already shared'); }
+    if (state === 'removed') { p.state.textContent = 'Removed'; }
+    if (state === 'failed') { p.why.textContent = it.error || 'Did not upload'; p.retry.hidden = !!it.fatal; }
+    updateStatus();
+  }
+  // Connection trouble and busy-server errors retry on their own (4 s, 12 s, 30 s, then once a
+  // minute for as long as the page is open), and straight away when the connection is back.
+  // Anything else waits for the Retry button.
+  const AUTO_RETRY = [4000, 12000, 30000];
+  const SLOW_RETRY = 60000, SLOW_RETRY_MAX = 60; // an hour of once-a-minute tries
+  const transient = (e) => !(e && e.status === 413) && ((e && e.status >= 500) ||
+    /network|timeout|stalled|Failed to fetch|Load failed|HTTP 5\d\d|HTTP 429|could not sign|never arrived|size mismatch/i.test(String((e && e.message) || e || '')));
+  function fail(it, msg, retryable) {
+    clearTimeout(it.timer); it.timer = null;
+    it.error = msg; setState(it, 'failed');
+    if (retryable && !it.fatal && (it.auto || 0) < AUTO_RETRY.length + SLOW_RETRY_MAX) {
+      const wait = AUTO_RETRY[it.auto || 0] || SLOW_RETRY;
+      it.auto = (it.auto || 0) + 1;
+      it.parts.why.textContent = navigator.onLine === false ? 'No connection · will send when you’re back' : msg + ' · trying again';
+      it.timer = setTimeout(() => { it.timer = null; if (it.state === 'failed') { setState(it, 'queued'); uploadLoop(); } }, wait);
+      updateStatus();
+    }
+    if (it.fatal) queue.del(it.id);
+  }
+  function dup(it) { setState(it, 'dup'); queue.del(it.id); }
+  function done(it) {
+    setState(it, 'done');
+    if (!mine.has(it.id)) { received += 1; if (it.kind === 'video') videosShared += 1; showProof(); }
+    mine.set(it.id, { thumb: it.thumbUrl, name: it.name, at: new Date().toISOString(), kind: it.kind, duration: it.duration, private: it.private });
+    queue.del(it.id);
+    renderMine();
+  }
+  function updateStatus() {
+    const counted = items.filter((i) => !i.fatal && i.state !== 'dup' && i.state !== 'removed');
+    const total = counted.length;
+    const ok = items.filter((i) => i.state === 'done').length;
+    const bad = items.filter((i) => i.state === 'failed' && !i.fatal).length; // too large etc.: the tile explains, no retry
+    const dups = items.filter((i) => i.state === 'dup').length;
+    const working = items.some(busy);
+    const bigVideo = items.some((i) => busy(i) && i.kind === 'video' && i.size > 100 * 1048576);
+    const dupNote = dups ? ' · ' + dups + ' already shared' : '';
+    let t;
+    const noSignal = navigator.onLine === false && (working || bad);
+    if (noSignal) t = 'No connection right now · ' + ok + ' of ' + total + ' received';
+    else if (working) t = 'Sending… ' + ok + ' of ' + total + ' received';
+    else if (bad && items.some((i) => i.state === 'failed' && !i.fatal && i.timer)) t = ok + ' of ' + total + ' received · having trouble connecting, still trying…';
+    else if (bad) t = ok + ' of ' + total + ' received · ' + bad + (bad === 1 ? ' needs' : ' need') + ' a retry';
+    else if (!total && dups) t = (dups === 1 ? 'That one was' : 'Those were') + ' already shared — thank you!';
+    else if (!total) t = 'Nothing left to send.';
+    else t = (ok === 1 ? 'Received' : 'All ' + ok + ' received') + dupNote + ' — thank you!';
+    $('trayStatus').textContent = t;
+    $('keepOpen').textContent = noSignal
+      ? 'Keep this page open. Everything will send on its own when your connection is back.'
+      : bigVideo ? 'Keep this page open until everything says Received. A big video can take a few minutes; if it stops, it picks up where it left off.'
+      : 'Keep this page open until everything says Received.';
+    $('keepOpen').hidden = !working && !noSignal;
+  }
+
+  // Files from the picker, from the phone's queue ("Send them now"), or picked again for an
+  // unfinished upload. `meta` (File → { id, private }) keeps an earlier uploadId, so the server
+  // sees the same upload and a video resumes instead of starting over.
+  function addFiles(files, meta) {
+    $('tray').hidden = false;
+    for (const f of files) {
+      const m = meta && meta.get(f);
+      const kind = isVideoFile(f) ? 'video' : 'photo';
+      const it = { id: (m && m.id) || rid(12), file: f, name: f.name || (kind === 'video' ? 'video.mp4' : 'photo.jpg'), type: f.type || '', size: f.size,
+                   kind, private: m ? !!m.private : privateMode, duration: null,
+                   state: 'queued', thumbDone: false, thumbBlob: null, thumbUrl: null, tries: 0, fatal: false };
+      $('trayGrid').appendChild(makeTile(it));
+      items.push(it);
+      if (kind !== 'video' && !isPhotoFile(f)) {
+        it.fatal = true; it.thumbDone = true; it.parts.ph.textContent = it.name; fail(it, 'Not a photo or video');
+      } else if (kind === 'video' && f.size > maxVideoBytes) {
+        it.fatal = true; it.thumbDone = true; it.parts.ph.textContent = '▶ ' + it.name;
+        fail(it, 'Too big to send here (' + mb(f.size) + ') · share a link below'); openLinkBox();
+      } else if (kind === 'photo' && f.size > maxFileBytes) {
+        it.fatal = true; it.thumbDone = true; it.parts.ph.textContent = it.name;
+        fail(it, 'Too large (max ' + mb(maxFileBytes) + ')');
+      } else {
+        setState(it, 'queued');
+        if (f.size <= KEEP_MAX) queue.put({ id: it.id, file: f, name: it.name, type: it.type, size: it.size, kind, private: it.private, at: Date.now() });
+      }
+    }
+    acquireWake();
+    thumbLoop();
+    renderResume();
+  }
+
+  let thumbBusy = false;
+  async function thumbLoop() {
+    if (thumbBusy) return;
+    thumbBusy = true;
+    try {
+      for (;;) {
+        const it = items.find((i) => !i.thumbDone);
+        if (!it) break;
+        const t = it.kind === 'video' ? await makePoster(it.file) : await makeThumb(it.file);
+        if (t && t.duration) { it.duration = t.duration; refreshBadges(it); }
+        it.sha = await fingerprint(it.file);
+        it.thumbDone = true;
+        if (t && t.blob) { it.thumbBlob = t.blob; it.thumbUrl = t.url; }
+        setImage(it);
+        // the same file picked twice on this phone: send it once
+        const twin = it.sha && items.find((o) => o !== it && o.sha === it.sha && !o.fatal && o.state !== 'removed');
+        if (twin && it.state === 'queued') dup(it);
+        uploadLoop();
+      }
+    } finally { thumbBusy = false; }
+  }
+
+  let upBusy = false;
+  async function uploadLoop() {
+    if (upBusy) return;
+    upBusy = true;
+    try {
+      for (;;) {
+        const ready = items.filter((i) => i.state === 'queued' && i.thumbDone).slice(0, maxBatch);
+        if (!ready.length) break;
+        await runBatch(ready);
+      }
+    } finally {
+      upBusy = false;
+      updateStatus();
+      if (!items.some(busy)) releaseWake();
+    }
+  }
+
+  // PUT straight to storage. A connection that stops moving for 45 s is dropped and
+  // retried, instead of hanging until the 10-minute timeout.
+  function putFile(url, blob, type, onProgress) {
+    return new Promise((resolve, reject) => {
+      const x = new XMLHttpRequest();
+      let last = Date.now();
+      const dog = setInterval(() => { if (Date.now() - last > 45000) { x.abort(); } }, 5000);
+      const end = (fn) => (arg) => { clearInterval(dog); fn(arg); };
+      x.open('PUT', url);
+      x.setRequestHeader('Content-Type', type || 'application/octet-stream');
+      x.upload.onprogress = (e) => { last = Date.now(); if (onProgress && e.lengthComputable) onProgress(e.loaded / e.total); };
+      x.onload = end(() => (x.status >= 200 && x.status < 300) ? resolve() : reject(Object.assign(new Error('HTTP ' + x.status), { status: x.status })));
+      x.onerror = end(() => reject(new Error('network')));
+      x.ontimeout = end(() => reject(new Error('timeout')));
+      x.onabort = end(() => reject(new Error('stalled')));
+      x.timeout = 30 * 60 * 1000;
+      x.send(blob);
+    });
+  }
+  // Videos: chunked, resumable. A dropped connection, a locked phone or a closed tab loses at most
+  // the current 6 MB chunk; the same file picked again continues from where it stopped.
+  const tusStatus = (e) => (e && e.originalResponse && e.originalResponse.getStatus && e.originalResponse.getStatus()) || (e && e.status) || 0;
+  function tusUpload(it, grant, key, onProgress) {
+    return new Promise((resolve, reject) => {
+      if (!window.tus) return reject(Object.assign(new Error('no tus'), { status: 400 }));
+      let last = Date.now(), restarts = 0, settled = false, dog = null;
+      const finish = (fn, arg) => { if (settled) return; settled = true; clearInterval(dog); it.tus = null; fn(arg); };
+      const upload = new tus.Upload(it.file, {
+        endpoint: grant.endpoint,
+        retryDelays: [0, 2000, 5000, 10000, 20000, 30000, 60000],
+        headers: { authorization: 'Bearer ' + key, apikey: key, 'x-upsert': 'true' },
+        uploadDataDuringCreation: true,
+        removeFingerprintOnSuccess: true,
+        chunkSize: 6 * 1024 * 1024,
+        metadata: { bucketName: grant.bucket, objectName: grant.objectName, contentType: it.type || 'video/mp4', cacheControl: '3600' },
+        onShouldRetry: (err) => { const s = tusStatus(err); return !(s >= 400 && s < 500 && [408, 409, 423, 429].indexOf(s) < 0); },
+        onError: (err) => finish(reject, err),
+        onProgress: (sent, total) => { last = Date.now(); onProgress(total ? sent / total : 0); },
+        onSuccess: () => finish(resolve),
+      });
+      it.tus = upload;
+      // a transfer that stops moving for 60 s is paused and resumed from the last chunk
+      dog = setInterval(() => {
+        if (settled || Date.now() - last < 60000) return;
+        if (restarts++ >= 30) { Promise.resolve(upload.abort(false)).catch(() => {}); finish(reject, new Error('stalled')); return; }
+        last = Date.now();
+        Promise.resolve(upload.abort(false)).then(() => upload.start(), () => upload.start());
+      }, 5000);
+      Promise.resolve(upload.findPreviousUploads()).then((prev) => {
+        if (prev && prev.length) upload.resumeFromPreviousUpload(prev[0]);
+        upload.start();
+      }, () => upload.start());
+    });
+  }
+  async function pool(list, n, fn) {
+    let next = 0;
+    const worker = async () => { while (next < list.length) { const it = list[next++]; await fn(it); } };
+    await Promise.all(Array.from({ length: Math.min(n, list.length) }, worker));
+  }
+  const friendly = (e) => {
+    const m = String((e && e.message) || e || '');
+    if ((e && e.status === 413) || /413/.test(m)) return 'The server refused this size — please tell Lisa & Pete';
+    if (/closed/i.test(m)) return 'Sharing is closed';
+    if (/full/i.test(m)) return 'Storage is full — please tell Lisa & Pete';
+    if (/network|timeout|stalled|Failed to fetch|Load failed/i.test(m)) return 'Connection dropped';
+    if (/HTTP 5\d\d|HTTP 429/i.test(m)) return 'Server busy';
+    return 'Did not upload';
+  };
+
+  // One file: upload, poster, then its own `complete` — so a tab closed after the next file
+  // starts can't strand this one.
+  async function sendOne(i) {
+    const u = i.put;
+    const prog = (p) => setState(i, 'uploading', p);
+    try {
+      if (i.kind === 'video' && u.resumable && uploadKey && window.tus) {
+        try { await tusUpload(i, u.resumable, uploadKey, prog); }
+        catch (e) {
+          const s = tusStatus(e);
+          if (s === 413) throw Object.assign(new Error('HTTP 413'), { status: 413 });
+          if (!(s >= 400 && s < 500)) throw e;          // connection trouble: the normal retry handles it
+          await putFile(u.url, i.file, i.type, prog);   // anything else: the plain upload instead
+        }
+      } else {
+        await putFile(u.url, i.file, i.type, prog);
+      }
+      if (i.thumbBlob && u.thumbUrl) { try { await putFile(u.thumbUrl, i.thumbBlob, 'image/jpeg'); } catch (e) { /* optional */ } }
+      setState(i, 'verifying');
+      const c = await api('complete', { uploadIds: [i.id] });
+      const f = (c.files || [])[0];
+      if (f && f.ok) done(i); else { const r = (f && f.reason) || 'Not received'; fail(i, r, transient(r)); }
+    } catch (e) { fail(i, friendly(e), transient(e)); }
+  }
+
+  async function runBatch(batch) {
+    batch.forEach((i) => setState(i, 'uploading', 0));
+    let intent;
+    try {
+      intent = await api('intent', {
+        contributor: nameEl.value.trim() || undefined,
+        uploads: batch.map((i) => ({ uploadId: i.id, name: i.name, type: i.type, size: i.size, kind: i.kind,
+                                     duration: i.duration ? Math.round(i.duration) : undefined, private: i.private,
+                                     thumb: !!i.thumbBlob, sha256: i.sha || undefined })),
+      });
+    } catch (e) {
+      batch.forEach((i) => fail(i, friendly(e), transient(e)));
+      if (/closed/i.test(String(e && e.message))) closed();
+      return;
+    }
+    if (intent.uploadKey) uploadKey = intent.uploadKey;
+    const byId = new Map((intent.uploads || []).map((u) => [u.uploadId, u]));
+    const work = batch.filter((i) => {
+      const u = byId.get(i.id);
+      if (!u || !u.ok) {
+        const r = (u && u.reason) || 'Could not start';
+        if (u && u.tooLarge) { i.fatal = true; fail(i, i.kind === 'video' ? 'Too big to send here (' + mb(i.size) + ') · share a link below' : 'Too large (' + r + ')'); if (i.kind === 'video') openLinkBox(); }
+        else fail(i, r, transient(r));
+        return false;
+      }
+      if (u.alreadyReceived) { done(i); return false; }
+      if (u.duplicate) { dup(i); return false; }
+      i.put = u; return true;
+    });
+    await Promise.all([
+      pool(work.filter((i) => i.kind !== 'video'), PHOTO_LANES, sendOne),
+      pool(work.filter((i) => i.kind === 'video'), VIDEO_LANES, sendOne),
+    ]);
+  }
+
+  // ---------- keep the phone awake, recover after a lock ----------
+  let wake = null;
+  async function acquireWake() {
+    try {
+      if ('wakeLock' in navigator && !wake) {
+        wake = await navigator.wakeLock.request('screen');
+        wake.addEventListener('release', () => { wake = null; });
+      }
+    } catch (e) { /* not supported: fine */ }
+  }
+  function releaseWake() { if (wake) { wake.release().catch(() => {}); wake = null; } }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    let again = false;
+    for (const i of items) if (i.state === 'failed' && !i.fatal && i.tries < 2) { clearTimeout(i.timer); i.timer = null; i.tries += 1; setState(i, 'queued'); again = true; }
+    if (items.some(busy)) acquireWake();
+    if (again) uploadLoop();
+  });
+  // Connection is back (Wi-Fi joined, out of the elevator): resend right away.
+  window.addEventListener('online', () => {
+    let again = false;
+    for (const i of items) if (i.state === 'failed' && !i.fatal) { clearTimeout(i.timer); i.timer = null; i.auto = 0; setState(i, 'queued'); again = true; }
+    if (helloFailed) hello();
+    if (again) { acquireWake(); uploadLoop(); }
+  });
+  window.addEventListener('offline', updateStatus);
+  window.addEventListener('beforeunload', (e) => { if (items.some(busy)) { e.preventDefault(); e.returnValue = ''; } });
+
+  // ---------- a video over the cap: share a link instead ----------
+  function openLinkBox() { $('linkBox').hidden = false; $('linkToggle').setAttribute('aria-expanded', 'true'); }
+  $('linkToggle').addEventListener('click', () => {
+    const show = $('linkBox').hidden;
+    $('linkBox').hidden = !show;
+    $('linkToggle').setAttribute('aria-expanded', String(show));
+    if (show) $('linkUrl').focus();
+  });
+  $('linkSend').addEventListener('click', async () => {
+    const link = $('linkUrl').value.trim();
+    if (!/^https?:\/\/\S{4,}$/i.test(link)) { $('linkStatus').textContent = 'Please paste the whole link (it starts with https://).'; return; }
+    $('linkSend').disabled = true; $('linkStatus').textContent = 'Sending…';
+    try {
+      await api('video_link', { link, contact: $('linkContact').value.trim() || undefined, name: nameEl.value.trim() || undefined });
+      $('linkStatus').textContent = 'Got it — thank you! Lisa & Pete will grab it from your link.';
+      $('linkUrl').value = '';
+    } catch (e) {
+      $('linkStatus').textContent = e.status === 400 ? (e.message || 'That link doesn’t look right.') : 'Could not send that. Check your connection and try again.';
+    } finally { $('linkSend').disabled = false; }
+  });
+
+  $('pick').addEventListener('click', () => { pickingUnfinished = false; $('file').click(); });
+  $('file').addEventListener('change', (ev) => {
+    const files = Array.from(ev.target.files || []);
+    ev.target.value = '';
+    if (!files.length) return;
+    // picked again for an unfinished upload: the same name and size keeps its uploadId
+    const meta = new Map();
+    const open = unfinished.filter((u) => !items.some((i) => i.id === u.uploadId) && !mine.has(u.uploadId));
+    for (const f of files) {
+      const u = open.find((x) => x.name === (f.name || '') && Number(x.bytes) === f.size);
+      if (u) { meta.set(f, { id: u.uploadId, private: !!u.private }); open.splice(open.indexOf(u), 1); }
+    }
+    pickingUnfinished = false;
+    addFiles(files, meta);
+  });
+
+  hello();
+  queue.all().then((rows) => { stored = rows.filter((r) => r && r.id && r.file); renderResume(); }).finally(loadMine);
+})();
+</script>
+</body>
+</html>
